@@ -1,0 +1,1579 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>k6 desde Cero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap">
+<style>
+/* Layout: curso de una pantalla por módulo — portada, barra de progreso superior con puntos, navegación inferior. Paleta propia: negro, naranja y blanco. */
+:root{
+  --bg:#FFFFFF; --surface:#FFFFFF; --sunk:#F4F4F4; --fg:#0A0A0A; --muted:#4D4D4D; --line:#E3E3E3;
+  --accent:#C2410C; --accent-soft:#FDEBDD; --ink-on-accent:#FFFFFF;
+  --pass:#2F7A52; --pass-soft:#E3F2EA; --fail:#B3261E; --fail-soft:#FBE4E2;
+  --warn:#8A5A00; --warn-soft:#F8EDD6;
+  --code-bg:#0F0F10; --code-fg:#EDEDED; --code-cm:#8C8C8C; --code-str:#FFA45C; --code-kw:#8FD3FF; --code-num:#F2C46D;
+  --shadow:0 1px 2px rgba(0,0,0,.08),0 8px 24px -12px rgba(0,0,0,.22);
+  --f-display:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-body:"IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"IBM Plex Mono", "SF Mono", Consolas, monospace;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0A0A0A; --surface:#141414; --sunk:#1C1C1C; --fg:#FAFAFA; --muted:#B8B8B8; --line:#2B2B2B;
+  --accent:#FF7A1A; --accent-soft:#3A1E08; --ink-on-accent:#1A0A00;
+  --pass:#6FCF9C; --pass-soft:#14301F; --fail:#FF8A80; --fail-soft:#3A1614;
+  --warn:#E8B65A; --warn-soft:#33260C;
+  --code-bg:#050505; --code-fg:#EDEDED; --code-cm:#8C8C8C; --code-str:#FFA45C; --code-kw:#8FD3FF; --code-num:#F2C46D;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 28px -14px rgba(0,0,0,.65);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0A0A0A; --surface:#141414; --sunk:#1C1C1C; --fg:#FAFAFA; --muted:#B8B8B8; --line:#2B2B2B;
+  --accent:#FF7A1A; --accent-soft:#3A1E08; --ink-on-accent:#1A0A00;
+  --pass:#6FCF9C; --pass-soft:#14301F; --fail:#FF8A80; --fail-soft:#3A1614;
+  --warn:#E8B65A; --warn-soft:#33260C;
+  --code-bg:#050505; --code-fg:#EDEDED; --code-cm:#8C8C8C; --code-str:#FFA45C; --code-kw:#8FD3FF; --code-num:#F2C46D;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 28px -14px rgba(0,0,0,.65);
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.6}
+a{color:var(--accent);text-underline-offset:2px}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.15;margin:0}
+h2{font-size:clamp(28px,4.4vw,40px);font-weight:700}
+h3{font-size:21px;font-weight:600;margin-top:8px}
+p{margin:0}
+code{font-family:var(--f-mono);font-size:.88em;background:var(--sunk);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+#app{min-height:100vh;display:flex;flex-direction:column}
+
+/* barra superior */
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:880px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px}
+.brand{font-family:var(--f-mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;cursor:pointer;background:none;border:0;color:var(--fg);padding:0}
+.brand b{color:var(--accent)}
+.dots{display:flex;gap:6px;flex:1;min-width:0;align-items:center;flex-wrap:wrap}
+.dot{width:22px;height:6px;border-radius:3px;background:var(--line);border:0;padding:0;cursor:pointer;flex:0 0 auto}
+.dot.done{background:var(--fg)}
+.dot.now{background:var(--accent)}
+.count{font-family:var(--f-mono);font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.bar{height:3px;background:var(--sunk)}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+
+main{flex:1;width:100%;max-width:880px;margin:0 auto;padding-inline:16px;padding-block:32px 40px}
+section.mod{display:flex;flex-direction:column;gap:22px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.lead{font-size:18px;color:var(--muted);max-width:66ch}
+.prose{display:flex;flex-direction:column;gap:14px;max-width:68ch}
+.prose ul,.prose ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+
+/* portada */
+.cover{padding-block:24px 8px;gap:26px}
+.cover h1{font-size:clamp(46px,9vw,92px);font-weight:700;letter-spacing:-.02em}
+.cover h1 span{color:var(--accent)}
+.credit{font-family:var(--f-mono);font-size:12px;color:var(--muted);letter-spacing:.03em}
+.toc{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:0;border-top:1px solid var(--line)}
+.toc button{all:unset;cursor:pointer;display:flex;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line);align-items:baseline}
+.toc button:hover .t{color:var(--accent)}
+.toc button:focus-visible{outline:2px solid var(--accent)}
+.toc .n{font-family:var(--f-mono);font-size:12px;color:var(--accent);font-variant-numeric:tabular-nums;min-width:22px}
+.toc .t{font-weight:500}
+.btn{font:inherit;font-weight:600;font-size:15px;border-radius:999px;padding:10px 20px;cursor:pointer;border:1px solid var(--fg);background:var(--fg);color:var(--bg)}
+.btn.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:var(--ink-on-accent)}
+.btn:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+
+/* cajas */
+.note{border-radius:var(--r);padding:14px 16px;background:var(--sunk);display:flex;flex-direction:column;gap:6px}
+.note strong.k{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.note.ctx{background:var(--accent-soft)}
+.note.ctx strong.k{color:var(--accent)}
+.note.warn{background:var(--warn-soft)}
+.note.warn strong.k{color:var(--warn)}
+.note.vid{background:transparent;border:1px dashed var(--line)}
+.panel{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:18px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.grid2>*{min-width:0}
+.term{border-top:2px solid var(--fg);padding-top:10px;display:flex;flex-direction:column;gap:4px}
+.term b{font-family:var(--f-mono);font-size:14px}
+.term span{color:var(--muted);font-size:15px}
+
+/* tablas */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:560px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--sunk);font-weight:600}
+tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+
+/* código */
+.code{position:relative;min-width:0}
+.code pre{margin:0;background:var(--code-bg);color:var(--code-fg);border-radius:var(--r);padding:16px 16px 16px;overflow-x:auto;font-family:var(--f-mono);font-size:13.5px;line-height:1.55;tab-size:2}
+.code .cap{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.copy{font:600 11.5px var(--f-mono);border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:6px;padding:3px 9px;cursor:pointer}
+.tk-c{color:var(--code-cm);font-style:italic}.tk-s{color:var(--code-str)}.tk-k{color:var(--code-kw)}.tk-n{color:var(--code-num)}
+
+/* ciclo de vida */
+.flow{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch}
+.flow .st{flex:1 1 140px;border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:4px;background:var(--surface);min-width:0}
+.flow .st b{font-family:var(--f-mono);font-size:13px}
+.flow .st span{font-size:13.5px;color:var(--muted)}
+.flow .st.hot{border-color:var(--accent);background:var(--accent-soft)}
+.flow .st em{font-style:normal;font-family:var(--f-mono);font-size:11px;color:var(--accent);letter-spacing:.05em;text-transform:uppercase}
+
+/* simulador */
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{font:600 13.5px var(--f-body);border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:7px 14px;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chart{width:100%;height:auto;display:block}
+.chart .ax{stroke:var(--line)}
+.chart text{fill:var(--muted);font:11px var(--f-mono)}
+.chart .ln{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round}
+.chart .ar{fill:var(--accent-soft);stroke:none}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.meta div{display:flex;flex-direction:column;gap:2px}
+.meta dt{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.meta dd{margin:0;font-size:15px}
+
+/* formularios */
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.form label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;min-width:0}
+.form label.full{grid-column:1/-1}
+input,select,textarea{font:inherit;font-size:14.5px;font-weight:400;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);width:100%;min-width:0}
+textarea{font-family:var(--f-mono);font-size:13px;min-height:80px;resize:vertical}
+.result{font-family:var(--f-display);font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.result small{font-family:var(--f-body);font-size:14px;color:var(--muted);font-weight:400}
+
+/* lector de resultados */
+.summary{background:var(--code-bg);color:var(--code-fg);border-radius:var(--r);padding:14px 0;overflow-x:auto;font-family:var(--f-mono);font-size:12.5px;line-height:1.65}
+.summary .ln2{display:block;white-space:pre;padding:0 16px;cursor:pointer;border-left:3px solid transparent}
+.summary .ln2.plain{cursor:default}
+.summary .ln2:not(.plain):hover{background:rgba(255,255,255,.06)}
+.summary .ln2.sel{border-left-color:var(--code-str);background:rgba(255,122,26,.16)}
+.explain{min-height:72px}
+
+/* evaluación */
+.exam-bar{display:grid;grid-template-columns:repeat(20,1fr);gap:4px;max-width:520px}
+.exam-bar span{height:18px;border-radius:3px;border:1px solid var(--line)}
+.exam-bar span.on{background:var(--accent);border-color:var(--accent)}
+.exam-legend{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.qprog{height:6px;border-radius:99px;background:var(--sunk);overflow:hidden}
+.qprog i{display:block;height:100%;background:var(--accent);transition:width .25s}
+.qhead{display:flex;justify-content:space-between;gap:12px;font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.qhead .tag{color:var(--accent);font-weight:600}
+.qhead .num{color:var(--muted);font-variant-numeric:tabular-nums}
+.qtext{font-family:var(--f-display);font-size:clamp(20px,3vw,25px);font-weight:600;line-height:1.3;text-wrap:balance}
+.qcode{margin:0}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid var(--line);border-radius:12px;padding:13px 14px;font-size:15.5px;display:flex;gap:12px;align-items:flex-start;background:var(--surface)}
+.opt .lt{font-family:var(--f-mono);font-size:12px;font-weight:600;width:24px;height:24px;border-radius:99px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none;margin-top:-1px}
+.opt:hover{border-color:var(--accent)}
+.opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.opt.ok{border-color:var(--pass);background:var(--pass-soft)}
+.opt.ok .lt{background:var(--pass);border-color:var(--pass);color:var(--bg)}
+.opt.bad{border-color:var(--fail);background:var(--fail-soft)}
+.opt.bad .lt{background:var(--fail);border-color:var(--fail);color:var(--bg)}
+.opt[disabled]{cursor:default}
+.qfb{border-radius:10px;padding:13px 15px;background:var(--sunk);font-size:15px;line-height:1.55}
+.qfb b{display:block;margin-bottom:2px}
+.fb{font-size:14.5px;color:var(--muted)}
+.res-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px}
+.ring{width:140px;height:140px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.ring>div{width:110px;height:110px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .n{font-family:var(--f-display);font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.ring .p{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);margin-top:4px}
+.pill{display:inline-flex;gap:6px;align-items:center;padding:6px 14px;border-radius:99px;font:600 13.5px var(--f-mono)}
+.pill.pass{background:var(--pass-soft);color:var(--pass)}
+.pill.fail{background:var(--fail-soft);color:var(--fail)}
+.brk{display:flex;flex-direction:column;gap:6px;width:100%;text-align:left}
+.brow{display:flex;gap:10px;align-items:baseline;font-size:14px;padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--sunk)}
+.brow .ic{font-family:var(--f-mono);font-weight:700;width:14px;flex:none}
+.brow.ok .ic{color:var(--pass)}.brow.no .ic{color:var(--fail)}
+.brow .tg{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);width:30px;flex:none}
+.brow span:last-child{min-width:0}
+.byline{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+
+/* certificado: siempre negro, naranja y blanco */
+.cert-form{max-width:440px;margin:0 auto;display:flex;flex-direction:column;gap:12px;text-align:center}
+.cert-form input{text-align:center;font-family:var(--f-display);font-size:18px;padding:12px}
+.cert-form input.err{border-color:var(--fail)}
+.certificate{position:relative;overflow:hidden;isolation:isolate;width:100%;max-width:780px;margin:0 auto;text-align:center;color:#FFFFFF;
+  background:radial-gradient(120% 140% at 105% -10%, rgba(255,122,26,.20) 0%, transparent 55%),radial-gradient(90% 110% at -5% 115%, rgba(255,122,26,.12) 0%, transparent 55%),#0A0A0A;
+  border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:clamp(34px,6vw,60px) clamp(22px,5.5vw,56px);
+  box-shadow:0 1px 2px rgba(0,0,0,.4),0 28px 56px -24px rgba(255,122,26,.38)}
+.certificate::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:84px;height:2px;background:#FF7A1A}
+.cert-load{position:absolute;inset:auto 0 0 0;height:62%;z-index:0;pointer-events:none;opacity:.32;
+  -webkit-mask-image:linear-gradient(100deg,transparent 10%,black 70%);mask-image:linear-gradient(100deg,transparent 10%,black 70%)}
+.cert-load svg{width:100%;height:100%;display:block}
+.cert-dots{position:absolute;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(rgba(255,255,255,.055) 1px,transparent 1px);background-size:16px 16px;
+  -webkit-mask-image:radial-gradient(65% 55% at 50% 15%,black,transparent 75%);mask-image:radial-gradient(65% 55% at 50% 15%,black,transparent 75%)}
+.cert-top,.cert-bottom{position:relative;z-index:1}
+.cert-course{font:700 12px var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.6)}
+.cert-brand{font-family:var(--f-mono);font-size:16px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-top:14px}
+.cert-kicker{font-family:var(--f-mono);font-size:16px;letter-spacing:.2em;text-transform:uppercase;color:#FF7A1A;margin-top:14px}
+.cert-name{font-family:var(--f-display);font-weight:700;font-size:clamp(28px,4.4vw,46px);line-height:1.1;margin-top:40px;color:#FFFFFF;overflow-wrap:anywhere}
+.cert-body{margin:30px auto 0;color:rgba(255,255,255,.66);font-size:15px;line-height:1.7;max-width:52ch}
+.cert-body b{color:#FFFFFF}
+.cert-score{display:inline-flex;flex-direction:column;align-items:center;gap:4px;margin-top:22px;padding:10px 26px;border-radius:12px;border:1px solid rgba(255,122,26,.4);background:rgba(255,122,26,.09)}
+.cert-score .l{font-family:var(--f-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.cert-score .v{font-family:var(--f-mono);font-size:15px;font-weight:600;color:#FFFFFF;font-variant-numeric:tabular-nums}
+.cert-bottom{margin-top:34px}
+.cert-meta{display:flex;justify-content:center;border-top:1px solid rgba(255,255,255,.1);padding-top:20px}
+.cert-meta>div{flex:1;max-width:220px;padding:0 16px;border-left:1px solid rgba(255,255,255,.08)}
+.cert-meta>div:first-child{border-left:0}
+.cert-meta .l{font-family:var(--f-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.4)}
+.cert-meta .v{font-family:var(--f-mono);font-size:12.5px;color:rgba(255,255,255,.88);margin-top:6px}
+.cert-meta .vn{font-family:var(--f-display);font-style:italic;font-weight:600;font-size:15px;color:#FFFFFF;margin-top:6px}
+.cert-meta .r{font-size:10px;color:rgba(255,255,255,.45);margin-top:2px}
+.cert-disc{margin:16px auto 0;font-size:10.5px;line-height:1.55;color:rgba(255,255,255,.42);max-width:62ch}
+.cert-seal{position:absolute;right:20px;bottom:20px;width:86px;height:86px;z-index:1}
+.cert-seal svg{width:100%;height:100%;filter:drop-shadow(0 6px 14px rgba(255,122,26,.45))}
+@media (max-width:600px){.cert-meta{flex-direction:column;gap:14px}.cert-meta>div{border-left:0;max-width:none;padding:0}.cert-seal{position:static;margin:20px auto 0}}
+@media print{
+  @page{size:landscape;margin:.35in}
+  body *{visibility:hidden}
+  .certificate,.certificate *{visibility:visible}
+  .certificate{position:fixed;inset:0;max-width:none;border-radius:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
+/* navegación inferior */
+.botnav{border-top:1px solid var(--line);background:var(--bg);position:sticky;bottom:0;padding-bottom:env(safe-area-inset-bottom,0px)}
+.botnav-in{max-width:880px;margin:0 auto;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.botnav .where{font-size:13px;color:var(--muted);text-align:center;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:520px){.botnav .where{display:none}.dot{width:14px}}
+</style>
+
+<div id="app">
+  <header class="topbar">
+    <div class="topbar-in">
+      <button class="brand" id="home" type="button">k6 <b>desde cero</b></button>
+      <nav class="dots" id="dots" aria-label="Módulos"></nav>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="bar"><i id="barfill"></i></div>
+  </header>
+
+  <main id="main">
+
+<!-- ============ PORTADA ============ -->
+<section class="mod cover" data-title="Portada" id="m0">
+  <div class="eyebrow">Curso interactivo · Pruebas no funcionales</div>
+  <h1>k6 desde <span>Cero</span></h1>
+  <p class="lead">Aprende cómo funciona Grafana k6 y cómo diseñar, ejecutar e interpretar cada tipo de prueba de rendimiento: smoke, carga promedio, estrés, picos, resistencia y punto de quiebre. Pensado para el equipo QA de Puntored y sus servicios transaccionales. Al final, una evaluación de 20 preguntas y tu certificado de finalización.</p>
+  <p class="credit">Elaborado por Nathalia Real · QA Tech Leader</p>
+  <div class="row">
+    <button class="btn accent" type="button" data-go="1">Empezar el curso</button>
+    <a class="btn ghost" href="https://www.youtube.com/playlist?list=PLvKmbsJ1VH7jbHxAoiO7z8x6XlpR_dcGi" target="_blank" rel="noopener">Ver la serie de videos</a>
+  </div>
+  <div class="toc" id="toc"></div>
+  <div class="note vid">
+    <strong class="k">Cómo usar este curso con los videos</strong>
+    <p>La serie <a href="https://www.youtube.com/playlist?list=PLvKmbsJ1VH7jbHxAoiO7z8x6XlpR_dcGi" target="_blank" rel="noopener">CURSO DE K6 Pruebas de rendimiento</a> (Informatica Live, 10 videos) es el complemento en video, empezando por <a href="https://www.youtube.com/watch?v=FfX-mef_574" target="_blank" rel="noopener">1. Introducción a K6 y pruebas de rendimiento</a>. Mira cada video y luego practica aquí. Este curso está alineado con la documentación oficial de k6 v2.3: si un video usa un comando que ya no existe (por ejemplo <code>--no-summary</code> o <code>k6 login</code>), sigue la versión de este curso.</p>
+  </div>
+</section>
+
+<!-- ============ M1 ============ -->
+<section class="mod" data-title="Rendimiento y pruebas no funcionales" id="m1" hidden>
+  <div class="eyebrow">Módulo 1</div>
+  <h2>¿Qué estamos probando cuando probamos rendimiento?</h2>
+  <div class="prose">
+    <p>Las pruebas funcionales responden <em>¿hace lo que debe?</em>. Las pruebas de rendimiento responden <em>¿lo sigue haciendo bien cuando muchas personas lo usan al mismo tiempo, durante mucho tiempo o de golpe?</em></p>
+    <p>En ISO/IEC 25010 esto es la característica <strong>Eficiencia de desempeño</strong>, con tres subcaracterísticas que vas a medir con k6:</p>
+  </div>
+  <div class="grid2">
+    <div class="term"><b>Comportamiento temporal</b><span>Tiempos de respuesta y throughput. En k6: <code>http_req_duration</code>, <code>http_reqs</code>.</span></div>
+    <div class="term"><b>Utilización de recursos</b><span>CPU, memoria, conexiones de BD. Se observa en el monitoreo del servidor mientras k6 genera la carga.</span></div>
+    <div class="term"><b>Capacidad</b><span>Máximo de usuarios o transacciones que soporta antes de degradarse. Se encuentra con pruebas de estrés y de punto de quiebre.</span></div>
+  </div>
+  <h3>Vocabulario mínimo</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Término</th><th>Qué significa</th><th>Ejemplo en un servicio transaccional</th></tr></thead>
+    <tbody>
+      <tr><td><b>VU</b> (usuario virtual)</td><td>Un "usuario" simulado que ejecuta tu script una y otra vez.</td><td>Un punto de venta que hace recargas en bucle.</td></tr>
+      <tr><td><b>Iteración</b></td><td>Una ejecución completa de la función principal del script.</td><td>Autenticarse, consultar saldo y hacer una recarga.</td></tr>
+      <tr><td><b>RPS / TPS</b></td><td>Peticiones o transacciones por segundo (throughput).</td><td>45 recargas por segundo en hora pico.</td></tr>
+      <tr><td><b>Latencia</b></td><td>Tiempo desde que se envía la petición hasta recibir la respuesta completa.</td><td>Una recarga que tarda 380 ms.</td></tr>
+      <tr><td><b>Percentil p(95)</b></td><td>El 95 % de las peticiones fue igual o más rápido que este valor.</td><td>p(95)=600 ms: solo 5 de cada 100 tardaron más.</td></tr>
+      <tr><td><b>Tasa de error</b></td><td>Porcentaje de peticiones fallidas (errores HTTP, timeouts).</td><td>0,3 % de transacciones rechazadas por timeout.</td></tr>
+      <tr><td><b>Think time</b></td><td>Pausa que simula el tiempo que tarda una persona entre acciones.</td><td>El cajero escribe el número de celular: 3 a 5 s.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">
+    <strong class="k">Por qué percentiles y no promedio</strong>
+    <p>Si 99 recargas tardan 200 ms y una tarda 20 s, el promedio da unos 400 ms y parece aceptable. El cliente que esperó 20 s no opina lo mismo. Por eso los criterios de aceptación de rendimiento se escriben con p(90), p(95) o p(99).</p>
+  </div>
+  <div class="note ctx">
+    <strong class="k">En nuestro contexto</strong>
+    <p>En una red de pagos y recargas el riesgo de rendimiento es de negocio: un punto de venta que espera una respuesta lenta repite la transacción, el cliente se va o se generan duplicados. Las pruebas no funcionales deben salir del análisis de riesgo de cada iniciativa, igual que las funcionales.</p>
+  </div>
+</section>
+
+<!-- ============ M2 ============ -->
+<section class="mod" data-title="Qué es k6 y cómo funciona" id="m2" hidden>
+  <div class="eyebrow">Módulo 2</div>
+  <h2>Qué es k6 y cómo ejecuta una prueba</h2>
+  <div class="prose">
+    <p><strong>Grafana k6</strong> es una herramienta open source de pruebas de rendimiento. El motor está escrito en Go (por eso consume pocos recursos) y los scripts se escriben en <strong>JavaScript</strong> (también acepta TypeScript). Se ejecuta desde la terminal con <code>k6 run</code>.</p>
+    <p>Sirve para pruebas de carga sobre APIs (HTTP, gRPC, WebSockets), pruebas de rendimiento en navegador con <code>k6/browser</code>, monitoreo sintético y automatización en CI/CD. La versión vigente es la <strong>v2.3</strong>.</p>
+  </div>
+  <h3>El ciclo de vida de un script</h3>
+  <p class="prose">Todo script de k6 pasa por estas etapas. Entenderlas evita el error más común: poner código en el lugar equivocado.</p>
+  <div class="flow">
+    <div class="st"><em>1 vez por VU</em><b>init</b><span>Código fuera de las funciones: imports, <code>options</code>, carga de archivos con <code>open()</code>.</span></div>
+    <div class="st"><em>1 vez</em><b>setup()</b><span>Prepara datos: obtener un token, crear registros. Lo que retorna llega a las demás etapas.</span></div>
+    <div class="st hot"><em>Cada VU, en bucle</em><b>default function</b><span>El flujo del usuario. Se repite mientras dure la prueba. Aquí se generan las métricas.</span></div>
+    <div class="st"><em>1 vez</em><b>teardown()</b><span>Limpieza: borrar datos de prueba, cerrar sesiones.</span></div>
+    <div class="st"><em>Al final</em><b>handleSummary()</b><span>Opcional. Personaliza el reporte final (JSON, HTML, texto).</span></div>
+  </div>
+  <div class="code"><div class="cap"><span>estructura.js</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-lifecycle"></pre></div>
+  <div class="note warn">
+    <strong class="k">Error frecuente</strong>
+    <p>Hacer peticiones HTTP en la etapa init no está permitido, y llamar a <code>open()</code> dentro de la función default tampoco. Regla práctica: <strong>lo que se lee una vez va arriba; lo que hace el usuario va en default</strong>.</p>
+  </div>
+  <h3>Qué cambió en k6 v2 (por si ves tutoriales antiguos)</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Antes (v0.x / v1)</th><th>Ahora (v2)</th></tr></thead>
+    <tbody>
+      <tr><td><code>k6 run --no-summary</code></td><td><code>k6 run --summary-mode=disabled</code></td></tr>
+      <tr><td><code>--summary-mode=legacy</code></td><td>Solo existen <code>compact</code> (por defecto), <code>full</code> y <code>disabled</code></td></tr>
+      <tr><td><code>k6 login cloud</code></td><td><code>k6 cloud login</code></td></tr>
+      <tr><td><code>k6 cloud script.js</code></td><td><code>k6 cloud run script.js</code></td></tr>
+      <tr><td>Ejecutor <code>externally-controlled</code>, comandos <code>k6 pause/resume/scale</code></td><td>Eliminados. Usa <code>ramping-vus</code> o un ejecutor de tasa de llegada</td></tr>
+      <tr><td><code>options.ext.loadimpact</code></td><td><code>options.cloud</code></td></tr>
+      <tr><td>Métrica de navegador <code>browser_web_vital_fid</code></td><td><code>browser_web_vital_inp</code></td></tr>
+    </tbody>
+  </table></div>
+  <div class="note vid"><strong class="k">Video relacionado</strong><p>Video 1 de la serie: <a href="https://www.youtube.com/watch?v=FfX-mef_574" target="_blank" rel="noopener">Introducción a K6 y pruebas de rendimiento</a>.</p></div>
+</section>
+
+<!-- ============ M3 ============ -->
+<section class="mod" data-title="Instalación y primer script" id="m3" hidden>
+  <div class="eyebrow">Módulo 3</div>
+  <h2>Instalación y tu primer script</h2>
+  <h3>1. Instala k6</h3>
+  <div class="grid2">
+    <div class="code"><div class="cap"><span>Windows</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-inst-win"></pre></div>
+    <div class="code"><div class="cap"><span>macOS</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-inst-mac"></pre></div>
+    <div class="code"><div class="cap"><span>Linux (Debian / Ubuntu)</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-inst-lnx"></pre></div>
+    <div class="code"><div class="cap"><span>Docker (sin instalar nada)</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-inst-dock"></pre></div>
+  </div>
+  <p class="prose">Verifica con <code>k6 version</code>. Para escribir scripts usa VS Code o Cursor; k6 incluye tipos para autocompletado.</p>
+  <h3>2. Crea el script</h3>
+  <p class="prose"><code>k6 new mi-prueba.js</code> genera una plantilla. O crea el archivo a mano. Este ejemplo usa <strong>QuickPizza</strong>, la aplicación de práctica pública de Grafana, para que puedas ejecutarlo sin tocar ningún ambiente de la empresa:</p>
+  <div class="code"><div class="cap"><span>primer-script.js</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-first"></pre></div>
+  <h3>3. Ejecútalo</h3>
+  <div class="code"><div class="cap"><span>terminal</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-run"></pre></div>
+  <div class="prose">
+    <p>Los parámetros de la línea de comandos sobrescriben los del script. Orden de prioridad, de menor a mayor: valores por defecto → <code>options</code> en el script → variables de entorno <code>K6_*</code> → flags de la CLI.</p>
+  </div>
+  <div class="note warn">
+    <strong class="k">Antes de apuntar a un ambiente real</strong>
+    <p>Nunca ejecutes carga contra producción, ni contra servicios de terceros (operadores, bancos, pasarelas), sin autorización escrita y coordinación con Infraestructura. Una prueba de carga mal dirigida es, para el servidor, indistinguible de un ataque.</p>
+  </div>
+</section>
+
+<!-- ============ M4 ============ -->
+<section class="mod" data-title="Checks, thresholds y métricas" id="m4" hidden>
+  <div class="eyebrow">Módulo 4</div>
+  <h2>Checks, thresholds y métricas</h2>
+  <div class="prose"><p>Estos tres conceptos convierten una ejecución en una prueba con veredicto. Confundirlos es el error número uno de quien empieza.</p></div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="eyebrow">Check</div>
+      <p>Valida <strong>cada respuesta</strong>: ¿el status es 200?, ¿el cuerpo trae el número de aprobación? Un check fallido <strong>no detiene ni reprueba</strong> la prueba; solo cuenta.</p>
+      <p class="fb">Equivale a una aserción suave.</p>
+    </div>
+    <div class="panel">
+      <div class="eyebrow">Threshold</div>
+      <p>Define el <strong>criterio de aceptación global</strong> sobre una métrica: p(95) &lt; 800 ms, errores &lt; 1 %. Si se incumple, k6 termina con <strong>código de salida 99</strong> y el pipeline falla.</p>
+      <p class="fb">Es tu SLO convertido en código.</p>
+    </div>
+  </div>
+  <div class="code"><div class="cap"><span>checks-thresholds.js</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-thresh"></pre></div>
+  <div class="note"><strong class="k">Truco clave</strong><p>Combina ambos: el threshold <code>checks: ['rate&gt;0.99']</code> convierte tus checks en criterio de aceptación. Y <code>abortOnFail</code> detiene la prueba apenas se incumple un umbral, útil en estrés para no seguir castigando un sistema que ya cayó.</p></div>
+  <h3>Métricas que k6 mide solo</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Métrica</th><th>Tipo</th><th>Qué mide</th></tr></thead>
+    <tbody>
+      <tr><td><code>http_req_duration</code></td><td>Trend</td><td>Tiempo total de la petición (envío + espera + recepción). La métrica principal.</td></tr>
+      <tr><td><code>http_req_waiting</code></td><td>Trend</td><td>Tiempo esperando la respuesta del servidor (TTFB). Si es alto, el cuello está en el backend.</td></tr>
+      <tr><td><code>http_req_failed</code></td><td>Rate</td><td>Proporción de peticiones fallidas (por defecto, status fuera de 200–399).</td></tr>
+      <tr><td><code>http_reqs</code></td><td>Counter</td><td>Total de peticiones y throughput por segundo.</td></tr>
+      <tr><td><code>checks</code></td><td>Rate</td><td>Proporción de checks exitosos.</td></tr>
+      <tr><td><code>iterations</code> / <code>iteration_duration</code></td><td>Counter / Trend</td><td>Cuántos flujos completos se hicieron y cuánto tardó cada uno.</td></tr>
+      <tr><td><code>vus</code> / <code>vus_max</code></td><td>Gauge</td><td>Usuarios virtuales activos y máximo asignado.</td></tr>
+      <tr><td><code>data_sent</code> / <code>data_received</code></td><td>Counter</td><td>Volumen de red generado.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Métricas personalizadas</h3>
+  <p class="prose">Cuando necesitas medir algo de negocio: hay cuatro tipos. <strong>Counter</strong> suma (transacciones rechazadas), <strong>Gauge</strong> guarda el último valor, <strong>Rate</strong> calcula porcentaje de verdaderos (recargas aprobadas) y <strong>Trend</strong> calcula estadísticas (tiempo de la recarga de punta a punta).</p>
+  <div class="code"><div class="cap"><span>metricas-negocio.js</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-custom"></pre></div>
+</section>
+
+<!-- ============ M5 ============ -->
+<section class="mod" data-title="Opciones, escenarios y ejecutores" id="m5" hidden>
+  <div class="eyebrow">Módulo 5</div>
+  <h2>Opciones, escenarios y ejecutores</h2>
+  <div class="prose">
+    <p>La forma de la carga se define en <code>options</code>, separada de la lógica del usuario. Hay tres niveles de complejidad:</p>
+    <ol>
+      <li><strong>Atajos</strong>: <code>vus</code> + <code>duration</code>, o <code>iterations</code>.</li>
+      <li><strong>Stages</strong>: rampas de subida, meseta y bajada.</li>
+      <li><strong>Scenarios</strong>: varios flujos en paralelo, cada uno con su ejecutor, su función y su horario.</li>
+    </ol>
+  </div>
+  <h3>Modelo cerrado vs modelo abierto</h3>
+  <div class="grid2">
+    <div class="panel">
+      <div class="eyebrow">Cerrado · basado en VUs</div>
+      <p>Defines <strong>cuántos usuarios</strong>. Cada VU espera la respuesta antes de seguir. Si el sistema se pone lento, k6 envía menos peticiones, y eso puede <strong>ocultar</strong> la degradación.</p>
+      <p class="fb">Ejecutores: <code>constant-vus</code>, <code>ramping-vus</code>, <code>shared-iterations</code>, <code>per-vu-iterations</code>.</p>
+    </div>
+    <div class="panel">
+      <div class="eyebrow">Abierto · basado en tasa de llegada</div>
+      <p>Defines <strong>cuántas iteraciones por segundo</strong> llegan, tarde lo que tarde el sistema, como los puntos de venta reales que no esperan a nadie. Si faltan VUs para sostener la tasa, k6 reporta <code>dropped_iterations</code>.</p>
+      <p class="fb">Ejecutores: <code>constant-arrival-rate</code>, <code>ramping-arrival-rate</code>.</p>
+    </div>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Ejecutor</th><th>Controla</th><th>Úsalo para</th></tr></thead>
+    <tbody>
+      <tr><td><code>shared-iterations</code></td><td>N iteraciones repartidas entre los VUs</td><td>Procesar un lote fijo de datos lo más rápido posible</td></tr>
+      <tr><td><code>per-vu-iterations</code></td><td>Cada VU hace exactamente N iteraciones</td><td>Que cada usuario de un CSV haga su flujo una vez</td></tr>
+      <tr><td><code>constant-vus</code></td><td>VUs fijos durante un tiempo</td><td>Smoke y pruebas simples</td></tr>
+      <tr><td><code>ramping-vus</code></td><td>VUs que suben y bajan por etapas</td><td>Carga promedio, estrés, soak (equivale a usar <code>stages</code>)</td></tr>
+      <tr><td><code>constant-arrival-rate</code></td><td>Iteraciones por segundo fijas</td><td>Validar un TPS objetivo ("aguanta 50 recargas/s")</td></tr>
+      <tr><td><code>ramping-arrival-rate</code></td><td>Iteraciones por segundo que cambian por etapas</td><td>Punto de quiebre, picos realistas</td></tr>
+    </tbody>
+  </table></div>
+  <div class="code"><div class="cap"><span>escenarios.js — dos flujos en paralelo</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-scen"></pre></div>
+  <div class="note ctx"><strong class="k">Recomendación para servicios transaccionales</strong><p>Si el requisito viene en TPS ("el servicio debe soportar X transacciones por segundo"), usa un ejecutor de tasa de llegada. Si viene en usuarios concurrentes ("N puntos de venta conectados"), usa VUs. Pregúntale siempre al negocio en qué unidad está el requisito.</p></div>
+</section>
+
+<!-- ============ M6 ============ -->
+<section class="mod" data-title="Datos, correlación y realismo" id="m6" hidden>
+  <div class="eyebrow">Módulo 6</div>
+  <h2>Datos, correlación y realismo</h2>
+  <div class="prose"><p>Una prueba con un solo usuario repitiendo la misma petición mide la caché, no el sistema. Para resultados creíbles necesitas datos variados, flujos encadenados y pausas humanas.</p></div>
+  <h3>Variables de entorno: el mismo script en QA y en Staging</h3>
+  <div class="code"><div class="cap"><span>terminal</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-env"></pre></div>
+  <h3>Datos desde CSV con SharedArray</h3>
+  <p class="prose"><code>SharedArray</code> carga el archivo una sola vez y lo comparte entre todos los VUs en modo de solo lectura. Con 500 VUs y un CSV de 10.000 filas, la diferencia en memoria es enorme.</p>
+  <div class="code"><div class="cap"><span>datos-csv.js</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-csv"></pre></div>
+  <h3>Correlación: usar la respuesta de una petición en la siguiente</h3>
+  <div class="code"><div class="cap"><span>flujo-recarga.js — API de ejemplo, ficticia</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-corr"></pre></div>
+  <div class="grid2">
+    <div class="term"><b>group()</b><span>Agrupa peticiones de un paso del negocio; el reporte muestra el tiempo por grupo.</span></div>
+    <div class="term"><b>tags</b><span>Etiqueta peticiones (<code>{ tags: { name: 'recarga' } }</code>) para filtrar y poner umbrales por endpoint.</span></div>
+    <div class="term"><b>sleep()</b><span>Think time. Sin él, cada VU dispara peticiones sin pausa y genera mucha más carga de la que un humano produciría.</span></div>
+  </div>
+  <div class="note warn"><strong class="k">Datos en un dominio de pagos</strong><p>Usa datos sintéticos y cuentas o terminales de prueba. Confirma con Desarrollo que las transacciones de carga no vayan a un autorizador real y cómo se reversan o limpian después (<code>teardown()</code> o un script aparte).</p></div>
+  <div class="note"><strong class="k">Atajos para escribir scripts</strong><p><strong>k6 Studio</strong> (aplicación de escritorio) graba tu navegación y genera el script. También puedes convertir un archivo HAR exportado desde DevTools, o generar un cliente a partir del OpenAPI del servicio. Revisa siempre el script generado: suele traer peticiones a analítica y recursos estáticos que conviene quitar.</p></div>
+</section>
+
+<!-- ============ M7 ============ -->
+<section class="mod" data-title="Tipos de prueba de carga" id="m7" hidden>
+  <div class="eyebrow">Módulo 7 · Simulador</div>
+  <h2>Los seis tipos de prueba, uno por uno</h2>
+  <p class="prose">Elige un tipo para ver la forma de la carga, cuándo usarlo y la configuración de k6. Los números de VUs son ejemplos: reemplázalos por los de tu línea base de producción.</p>
+  <div class="panel">
+    <div class="tabs" role="tablist" id="ttabs"></div>
+    <svg class="chart" id="tchart" viewBox="0 0 640 230" role="img" aria-label="Forma de la carga en el tiempo"></svg>
+    <dl class="meta" id="tmeta"></dl>
+    <p id="tdesc"></p>
+    <div class="note ctx"><strong class="k">Cuándo aplicarla aquí</strong><p id="tctx"></p></div>
+    <div class="code"><div class="cap"><span id="tfile">options</span><button class="copy" type="button">Copiar</button></div><pre id="tcode"></pre></div>
+  </div>
+  <div class="note">
+    <strong class="k">Orden recomendado</strong>
+    <p>Siempre empieza con <strong>smoke</strong>. Si pasa, sigue con <strong>carga promedio</strong> y desde ahí avanza a estrés, picos y resistencia según el riesgo. El punto de quiebre se hace pocas veces. Mantén formas simples (subida, meseta, bajada) y evita montañas rusas: resultados simples se pueden comparar entre ejecuciones.</p>
+  </div>
+</section>
+
+<!-- ============ M8 ============ -->
+<section class="mod" data-title="Planificar con números" id="m8" hidden>
+  <div class="eyebrow">Módulo 8 · Calculadora</div>
+  <h2>¿Cuántos usuarios virtuales necesito?</h2>
+  <div class="prose">
+    <p>El error más común es inventar el número de VUs. El punto de partida debe ser el tráfico real de producción (logs, APM, reportes de negocio). Con la <strong>Ley de Little</strong> pasas de transacciones a usuarios concurrentes:</p>
+    <p style="font-family:var(--f-mono);font-size:15px">VUs = (transacciones por segundo) × (duración de una iteración en segundos)</p>
+    <p>La duración de la iteración incluye el tiempo de respuesta y el think time.</p>
+  </div>
+  <div class="panel">
+    <div class="form">
+      <label for="cTxh">Transacciones en la hora pico<input id="cTxh" type="number" min="1" value="36000"></label>
+      <label for="cResp">Tiempo de respuesta promedio (s)<input id="cResp" type="number" min="0" step="0.1" value="0.8"></label>
+      <label for="cThink">Think time por iteración (s)<input id="cThink" type="number" min="0" step="0.5" value="4"></label>
+      <label for="cFactor">Factor de crecimiento (%)<input id="cFactor" type="number" min="0" step="5" value="30"></label>
+    </div>
+    <div class="grid2">
+      <div><div class="eyebrow">Tasa actual</div><div class="result" id="cTps">—</div></div>
+      <div><div class="eyebrow">VUs para carga promedio</div><div class="result" id="cVus">—</div></div>
+      <div><div class="eyebrow">Objetivo con crecimiento</div><div class="result" id="cVusG">—</div></div>
+    </div>
+    <p class="fb">Valores iniciales de ejemplo. Reemplázalos por los datos de producción del servicio que vas a probar.</p>
+    <div class="code"><div class="cap"><span>config sugerida (modelo abierto)</span><button class="copy" type="button">Copiar</button></div><pre id="cCode"></pre></div>
+  </div>
+  <h3>De requisito a threshold</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Requisito de negocio</th><th>Threshold en k6</th></tr></thead>
+    <tbody>
+      <tr><td>"El 95 % de las recargas responde en menos de 1 segundo"</td><td><code>'http_req_duration{name:recarga}': ['p(95)&lt;1000']</code></td></tr>
+      <tr><td>"Menos de 1 % de transacciones fallidas"</td><td><code>http_req_failed: ['rate&lt;0.01']</code></td></tr>
+      <tr><td>"Ninguna consulta de saldo supera 3 segundos"</td><td><code>'http_req_duration{name:saldo}': ['max&lt;3000']</code></td></tr>
+      <tr><td>"El servicio sostiene 50 TPS"</td><td><code>http_reqs: ['rate&gt;=50']</code> + ejecutor <code>constant-arrival-rate</code></td></tr>
+    </tbody>
+  </table></div>
+  <div class="note ctx"><strong class="k">Si no hay requisito</strong><p>Pasa muy seguido. No inventes un SLO: ejecuta una carga promedio, documenta los resultados como <strong>línea base</strong>, y propón los umbrales al Product Owner con esa evidencia. Desde ahí, cada versión se compara contra la línea base.</p></div>
+</section>
+
+<!-- ============ M9 ============ -->
+<section class="mod" data-title="Leer resultados y reportes" id="m9" hidden>
+  <div class="eyebrow">Módulo 9 · Lector interactivo</div>
+  <h2>Cómo leer los resultados</h2>
+  <p class="prose">Este es un resumen de fin de prueba de ejemplo (el formato exacto puede variar entre versiones). Toca cualquier línea resaltable para ver qué significa y qué decisión tomar.</p>
+  <div class="summary" id="sum"></div>
+  <div class="panel explain" id="sumx"><p class="fb">Selecciona una línea del resumen.</p></div>
+  <h3>Cómo leer un resultado, en orden</h3>
+  <div class="prose"><ol>
+    <li><strong>Thresholds</strong>: ¿pasó o falló? Es el veredicto.</li>
+    <li><strong>Errores</strong> (<code>http_req_failed</code>, checks fallidos): un tiempo de respuesta excelente no sirve si las respuestas son errores rápidos.</li>
+    <li><strong>Percentiles</strong>, no el promedio: compara p(95) y max para detectar colas.</li>
+    <li><strong>Throughput</strong>: ¿se alcanzó la tasa objetivo? Si hay <code>dropped_iterations</code>, no.</li>
+    <li><strong>Correlación con el servidor</strong>: CPU, memoria y BD durante la misma ventana de tiempo.</li>
+  </ol></div>
+  <h3>Reportes</h3>
+  <div class="code"><div class="cap"><span>terminal</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-out"></pre></div>
+  <div class="code"><div class="cap"><span>handleSummary — guardar evidencia</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-summary"></pre></div>
+  <div class="note ctx"><strong class="k">Evidencia para Zephyr y Jira</strong><p>Adjunta el reporte HTML del web dashboard y el <code>summary.json</code> como evidencia de la ejecución del caso de prueba en Zephyr. El informe debe decir: ambiente, versión desplegada, tipo de prueba, carga aplicada, thresholds, resultado y hallazgos.</p></div>
+</section>
+
+<!-- ============ M10 ============ -->
+<section class="mod" data-title="Pruebas de navegador" id="m10" hidden>
+  <div class="eyebrow">Módulo 10</div>
+  <h2>Rendimiento en el navegador con k6/browser</h2>
+  <div class="prose">
+    <p>Las pruebas HTTP miden el backend. Pero el usuario percibe también lo que pasa en el navegador: carga de JavaScript, renderizado, interacción. El módulo <code>k6/browser</code> controla un Chromium real con una API similar a Playwright y mide los <strong>Core Web Vitals</strong>.</p>
+  </div>
+  <div class="grid2">
+    <div class="term"><b>LCP</b><span>Largest Contentful Paint: cuándo aparece el contenido principal. Bueno: ≤ 2,5 s.</span></div>
+    <div class="term"><b>INP</b><span>Interaction to Next Paint: qué tan rápido responde la página a un clic. Bueno: ≤ 200 ms. Reemplazó a FID.</span></div>
+    <div class="term"><b>CLS</b><span>Cumulative Layout Shift: cuánto "salta" la página mientras carga. Bueno: ≤ 0,1.</span></div>
+  </div>
+  <div class="code"><div class="cap"><span>browser-login.js</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-browser"></pre></div>
+  <div class="note"><strong class="k">Enfoque híbrido</strong><p>Un navegador consume muchos más recursos que un VU HTTP. La práctica recomendada es generar la carga con muchos VUs HTTP y, en paralelo, unos pocos VUs de navegador que miden la experiencia del usuario mientras el sistema está bajo presión.</p></div>
+  <div class="note ctx"><strong class="k">Relación con la automatización funcional</strong><p>No reemplaza las pruebas E2E. Si ya tienen flujos en Playwright, la documentación de k6 tiene una guía para migrarlos, pero el objetivo aquí es medir tiempos, no validar toda la funcionalidad.</p></div>
+</section>
+
+<!-- ============ M11 ============ -->
+<section class="mod" data-title="Automatización y gobierno QA" id="m11" hidden>
+  <div class="eyebrow">Módulo 11</div>
+  <h2>Automatizar y gobernar las pruebas de rendimiento</h2>
+  <h3>Estructura de repositorio sugerida</h3>
+  <div class="code"><div class="cap"><span>estructura</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-repo"></pre></div>
+  <h3>En el pipeline</h3>
+  <p class="prose">Corre un <strong>smoke</strong> en cada despliegue a QA y una <strong>carga promedio</strong> programada (nocturna o antes de cada release). Si un threshold falla, k6 sale con código 99 y el pipeline se detiene.</p>
+  <div class="code"><div class="cap"><span>.github/workflows/k6.yml</span><button class="copy" type="button">Copiar</button></div><pre data-src="c-ci"></pre></div>
+  <h3>Checklist antes de cada ejecución</h3>
+  <div class="panel" id="check"></div>
+  <h3>Cómo se registra en nuestras herramientas</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Dónde</th><th>Qué se registra</th></tr></thead>
+    <tbody>
+      <tr><td>Jira (tablero de la iniciativa)</td><td>La tarea de prueba de rendimiento. Si no hay iniciativa que la enmarque (configuración de ambiente, línea base general), en el tablero QA Team.</td></tr>
+      <tr><td>Zephyr</td><td>Un caso de prueba por tipo y flujo (por ejemplo "Carga promedio – Recarga"), con precondiciones (ambiente, datos, carga) y resultado esperado = thresholds. La ejecución lleva el reporte como evidencia.</td></tr>
+      <tr><td>Repositorio</td><td>Scripts versionados, datos sintéticos y la configuración por ambiente.</td></tr>
+      <tr><td>Informe</td><td>Hallazgos, comparación con la línea base y recomendación (pasa / pasa con riesgo / no pasa).</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note ctx"><strong class="k">Apoyo del agente de gobernanza QA</strong><p>La skill de diseño de casos puede proponer escenarios de rendimiento a partir de los criterios de aceptación y del análisis de riesgo. El script, la carga y los umbrales siguen siendo responsabilidad del QA, que los valida con Desarrollo e Infraestructura.</p></div>
+</section>
+
+<!-- ============ M12 ============ -->
+<section class="mod" data-title="Constructor de scripts" id="m12" hidden>
+  <div class="eyebrow">Módulo 12 · Herramienta</div>
+  <h2>Constructor de scripts</h2>
+  <p class="prose">Completa los campos y obtén un script listo para ejecutar, con checks, thresholds, variables de entorno y la forma de carga del tipo de prueba elegido.</p>
+  <div class="panel">
+    <div class="form">
+      <label for="bName">Nombre del flujo<input id="bName" type="text" value="recarga"></label>
+      <label for="bType">Tipo de prueba<select id="bType"></select></label>
+      <label for="bUrl">URL base (por defecto)<input id="bUrl" type="text" value="https://qa.tu-servicio.local"></label>
+      <label for="bMethod">Método<select id="bMethod"><option>GET</option><option selected>POST</option><option>PUT</option></select></label>
+      <label for="bPath">Ruta del endpoint<input id="bPath" type="text" value="/api/v1/recargas"></label>
+      <label for="bStatus">Status esperado<input id="bStatus" type="number" value="200"></label>
+      <label for="bP95">p(95) máximo (ms)<input id="bP95" type="number" min="1" value="1000"></label>
+      <label for="bErr">Errores máximos (%)<input id="bErr" type="number" min="0" step="0.1" value="1"></label>
+      <label for="bThink">Think time (s)<input id="bThink" type="number" min="0" step="0.5" value="3"></label>
+      <label for="bAuth">Autenticación<select id="bAuth"><option value="none">Ninguna</option><option value="bearer" selected>Bearer token (variable TOKEN)</option></select></label>
+      <label class="full" for="bBody">Cuerpo JSON (solo POST / PUT)<textarea id="bBody">{ "celular": "3001234567", "operador": "OPERADOR_PRUEBA", "valor": 5000 }</textarea></label>
+    </div>
+    <div class="code"><div class="cap"><span id="bFile">recarga.js</span><button class="copy" type="button">Copiar</button></div><pre id="bOut"></pre></div>
+    <div class="code"><div class="cap"><span>cómo ejecutarlo</span><button class="copy" type="button">Copiar</button></div><pre id="bRun"></pre></div>
+  </div>
+</section>
+
+<!-- ============ M13 ============ -->
+<section class="mod" data-title="Evaluación y certificado" id="m13" hidden>
+  <div class="eyebrow">Módulo 13</div>
+
+  <div id="exIntro" class="prose" style="max-width:none;gap:20px">
+    <h2>Evaluación final</h2>
+    <p class="lead">Veinte preguntas de opción única sobre todo el curso, una por una y con retroalimentación inmediata. La mayoría son escenarios: tendrás que decidir qué haría un QA en una situación concreta.</p>
+    <div class="exam-bar" id="exBar" aria-hidden="true"></div>
+    <p class="exam-legend">20 preguntas · necesitas 16 correctas (80 %) para aprobar y generar tu certificado</p>
+    <div class="grid2">
+      <div class="term"><b>Qué evalúa</b><span>Conceptos, ejecutores, tipos de prueba, cálculo de carga, lectura de resultados y buenas prácticas de gobierno QA.</span></div>
+      <div class="term"><b>Cómo funciona</b><span>Al elegir una opción se bloquea la pregunta y ves la explicación. No hay límite de tiempo y puedes reintentar.</span></div>
+    </div>
+    <div class="row"><button class="btn accent" type="button" id="exStart">Comenzar la evaluación</button></div>
+  </div>
+
+  <div id="exRun" hidden style="display:flex;flex-direction:column;gap:18px">
+    <div class="qprog"><i id="exProg"></i></div>
+    <div class="qhead"><span class="tag" id="exTag"></span><span class="num" id="exNum"></span></div>
+    <div class="qtext" id="exQ"></div>
+    <div class="code qcode" id="exCodeWrap" hidden><pre id="exCode"></pre></div>
+    <div class="opts" id="exOpts"></div>
+    <div class="qfb" id="exFb" hidden></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn accent" type="button" id="exNext" hidden>Siguiente pregunta</button></div>
+  </div>
+
+  <div id="exRes" hidden>
+    <div class="panel res-card">
+      <div class="ring" id="exRing"><div><span class="n" id="exScore"></span><span class="p" id="exPct"></span></div></div>
+      <span class="pill" id="exPill"></span>
+      <h2 style="font-size:24px" id="exMsg"></h2>
+      <div class="brk" id="exBrk"></div>
+      <div class="row" style="justify-content:center">
+        <button class="btn ghost" type="button" id="exRetry">Reintentar evaluación</button>
+        <button class="btn accent" type="button" id="exToCert" hidden>Generar mi certificado</button>
+      </div>
+      <p class="byline">Contenido elaborado por Nathalia Real Bustos · QA Tech Leader</p>
+    </div>
+  </div>
+
+  <div id="exCertForm" hidden>
+    <div class="cert-form">
+      <div class="eyebrow">Último paso</div>
+      <h2 style="font-size:28px">¿A nombre de quién generamos el certificado?</h2>
+      <p class="fb">Escribe tu nombre tal como quieres que aparezca.</p>
+      <label for="exName" class="fb">Nombre completo</label>
+      <input id="exName" type="text" maxlength="60" autocomplete="name" placeholder="Nombre y apellido">
+      <div class="row" style="justify-content:center">
+        <button class="btn ghost" type="button" id="exBackRes">Volver a resultados</button>
+        <button class="btn accent" type="button" id="exMake">Generar certificado</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="exCert" hidden style="display:flex;flex-direction:column;gap:18px">
+    <div class="certificate" id="certNode">
+      <div class="cert-load" aria-hidden="true"><svg viewBox="0 0 600 200" preserveAspectRatio="none">
+        <g fill="none" stroke="rgba(255,122,26,.55)" stroke-width="1.4">
+          <polyline points="0,190 90,190 150,90 330,90 380,190 600,190"/>
+          <polyline points="0,200 260,200 300,20 330,200 600,200" opacity=".6"/>
+          <polyline points="0,196 600,40" stroke-dasharray="4 6" opacity=".7"/>
+        </g>
+        <g fill="rgba(255,122,26,.7)"><circle cx="150" cy="90" r="3"/><circle cx="330" cy="90" r="3"/><circle cx="300" cy="20" r="3"/></g>
+      </svg></div>
+      <div class="cert-dots" aria-hidden="true"></div>
+      <div class="cert-top">
+        <div class="cert-course">Curso interactivo · Pruebas no funcionales</div>
+        <div class="cert-brand">k6 desde Cero · Grafana k6 v2</div>
+        <div class="cert-kicker">Certificado de finalización</div>
+        <div class="cert-name" id="cName"></div>
+        <p class="cert-body">Completó satisfactoriamente el curso <b>k6 desde Cero</b>, que cubre el diseño, la ejecución y el análisis de pruebas de rendimiento con Grafana k6: smoke, carga promedio, estrés, picos, resistencia y punto de quiebre.</p>
+        <div class="cert-score"><span class="l">Evaluación final</span><span class="v" id="cScore"></span></div>
+      </div>
+      <div class="cert-bottom">
+        <div class="cert-meta">
+          <div><div class="l">Autoría</div><div class="vn">Nathalia Real Bustos</div><div class="r">QA Tech Leader</div></div>
+          <div><div class="l">Fecha</div><div class="v" id="cDate"></div></div>
+          <div><div class="l">Identificador</div><div class="v" id="cId"></div></div>
+        </div>
+        <p class="cert-disc">Certificado de estudio generado por el curso k6 desde Cero. No constituye una certificación oficial de Grafana Labs.</p>
+      </div>
+      <div class="cert-seal" aria-hidden="true"><svg viewBox="0 0 120 120">
+        <defs>
+          <path id="sealArc" d="M 60,60 m -49,0 a 49,49 0 1,1 98,0 a 49,49 0 1,1 -98,0"/>
+          <radialGradient id="sealFill" cx="50%" cy="40%" r="68%"><stop offset="0%" stop-color="#FFA45C"/><stop offset="55%" stop-color="#FF7A1A"/><stop offset="100%" stop-color="#9A3A06"/></radialGradient>
+        </defs>
+        <circle cx="60" cy="60" r="35" fill="url(#sealFill)"/>
+        <circle cx="60" cy="60" r="35" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1"/>
+        <path d="M46 61l10 10 20-23" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text font-size="8" letter-spacing="2.2" fill="#FF7A1A" font-family="IBM Plex Mono, monospace"><textPath href="#sealArc" startOffset="1%" id="sealTxt">QA · PERFORMANCE · 2026 ·</textPath></text>
+      </svg></div>
+    </div>
+    <p class="fb" id="cTip" style="text-align:center">Para guardarlo, toma una captura de pantalla del certificado.</p>
+    <div class="row" style="justify-content:center">
+      <button class="btn ghost" type="button" id="cEdit">Cambiar nombre</button>
+      <button class="btn ghost" type="button" id="cRestart">Reiniciar evaluación</button>
+      <button class="btn accent" type="button" id="cPrint" hidden>Imprimir / PDF</button>
+    </div>
+  </div>
+
+  <div class="note vid"><strong class="k">Para seguir</strong><p>Documentación oficial: <a href="https://grafana.com/docs/k6/latest/" target="_blank" rel="noopener">grafana.com/docs/k6</a> · Tipos de prueba: <a href="https://grafana.com/docs/k6/latest/testing-guides/test-types/" target="_blank" rel="noopener">Load test types</a> · Serie de videos: <a href="https://www.youtube.com/playlist?list=PLvKmbsJ1VH7jbHxAoiO7z8x6XlpR_dcGi" target="_blank" rel="noopener">CURSO DE K6</a>.</p></div>
+</section>
+
+  </main>
+
+  <footer class="botnav">
+    <div class="botnav-in">
+      <button class="btn ghost" type="button" id="prev">← Anterior</button>
+      <span class="where" id="where"></span>
+      <button class="btn accent" type="button" id="next">Siguiente →</button>
+    </div>
+  </footer>
+</div>
+
+<!-- ===== Fragmentos de código ===== -->
+<script type="text/plain" id="c-lifecycle">// 1. INIT: se ejecuta una vez por cada VU
+import http from 'k6/http';
+import { sleep } from 'k6';
+
+export const options = { vus: 5, duration: '30s' };
+
+// 2. SETUP: una sola vez antes de la carga
+export function setup() {
+  const res = http.post(`${__ENV.BASE_URL}/auth/token`, JSON.stringify({ usuario: 'qa', clave: __ENV.CLAVE }),
+    { headers: { 'Content-Type': 'application/json' } });
+  return { token: res.json('token') };   // llega como parámetro a default y teardown
+}
+
+// 3. VU CODE: cada VU la repite en bucle
+export default function (data) {
+  http.get(`${__ENV.BASE_URL}/saldo`, { headers: { Authorization: `Bearer ${data.token}` } });
+  sleep(1);
+}
+
+// 4. TEARDOWN: una vez al final
+export function teardown(data) {
+  // limpiar datos de prueba
+}</script>
+
+<script type="text/plain" id="c-inst-win">winget install k6 --source winget
+# o con Chocolatey
+choco install k6</script>
+<script type="text/plain" id="c-inst-mac">brew install k6</script>
+<script type="text/plain" id="c-inst-lnx">sudo gpg -k
+sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+  --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+  | sudo tee /etc/apt/sources.list.d/k6.list
+sudo apt-get update && sudo apt-get install k6</script>
+<script type="text/plain" id="c-inst-dock">docker run --rm -i grafana/k6 run - <primer-script.js</script>
+
+<script type="text/plain" id="c-first">import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+// Carga: 10 usuarios virtuales durante 30 segundos
+export const options = {
+  vus: 10,
+  duration: '30s',
+};
+
+export default function () {
+  const res = http.get('https://quickpizza.grafana.com');
+
+  check(res, {
+    'status es 200': (r) => r.status === 200,
+    'responde en menos de 800 ms': (r) => r.timings.duration < 800,
+  });
+
+  sleep(1); // think time: 1 segundo entre iteraciones
+}</script>
+
+<script type="text/plain" id="c-run"># Ejecutar con las options del script
+k6 run primer-script.js
+
+# Sobrescribir la carga desde la terminal
+k6 run --vus 20 --duration 1m primer-script.js
+
+# Ver el dashboard en vivo en http://localhost:5665
+K6_WEB_DASHBOARD=true k6 run primer-script.js
+
+# En PowerShell (Windows) las variables se definen así:
+$env:K6_WEB_DASHBOARD="true"; k6 run primer-script.js</script>
+
+<script type="text/plain" id="c-thresh">import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+export const options = {
+  vus: 20,
+  duration: '2m',
+  thresholds: {
+    http_req_failed: ['rate<0.01'],                 // menos de 1 % de errores
+    http_req_duration: ['p(95)<800', 'p(99)<1500'],   // percentiles en ms
+    checks: ['rate>0.99'],                            // 99 % de checks exitosos
+    // umbral solo para las peticiones etiquetadas como "recarga"
+    'http_req_duration{name:recarga}': [
+      { threshold: 'p(95)<1000', abortOnFail: true, delayAbortEval: '30s' },
+    ],
+  },
+};
+
+export default function () {
+  const res = http.post(`${__ENV.BASE_URL}/api/v1/recargas`, JSON.stringify({ valor: 5000 }), {
+    headers: { 'Content-Type': 'application/json' },
+    tags: { name: 'recarga' },
+  });
+
+  check(res, {
+    'status 200': (r) => r.status === 200,
+    'trae número de aprobación': (r) => r.json('aprobacion') !== undefined,
+  });
+  sleep(1);
+}</script>
+
+<script type="text/plain" id="c-custom">import http from 'k6/http';
+import { check } from 'k6';
+import { Counter, Rate, Trend } from 'k6/metrics';
+
+// Se declaran en init
+const rechazadas = new Counter('recargas_rechazadas');
+const aprobadas = new Rate('recargas_aprobadas');
+const tiempoRecarga = new Trend('tiempo_recarga', true); // true = es un tiempo
+
+export const options = {
+  thresholds: {
+    recargas_aprobadas: ['rate>0.98'],
+    tiempo_recarga: ['p(95)<1200'],
+  },
+};
+
+export default function () {
+  const res = http.post(`${__ENV.BASE_URL}/api/v1/recargas`, JSON.stringify({ valor: 5000 }),
+    { headers: { 'Content-Type': 'application/json' } });
+
+  const ok = check(res, { 'aprobada': (r) => r.json('estado') === 'APROBADA' });
+  aprobadas.add(ok);
+  if (!ok) rechazadas.add(1);
+  tiempoRecarga.add(res.timings.duration);
+}</script>
+
+<script type="text/plain" id="c-scen">import http from 'k6/http';
+import { sleep } from 'k6';
+
+export const options = {
+  scenarios: {
+    // Flujo 1: consultas de saldo, modelo cerrado
+    consultas: {
+      executor: 'ramping-vus',
+      exec: 'consultarSaldo',
+      startVUs: 0,
+      stages: [
+        { duration: '2m', target: 50 },
+        { duration: '10m', target: 50 },
+        { duration: '2m', target: 0 },
+      ],
+    },
+    // Flujo 2: recargas a tasa fija, modelo abierto
+    recargas: {
+      executor: 'constant-arrival-rate',
+      exec: 'hacerRecarga',
+      rate: 20,              // 20 iteraciones...
+      timeUnit: '1s',        // ...por segundo
+      duration: '14m',
+      preAllocatedVUs: 40,   // VUs listos desde el inicio
+      maxVUs: 120,           // tope si el sistema se pone lento
+    },
+  },
+};
+
+export function consultarSaldo() {
+  http.get(`${__ENV.BASE_URL}/api/v1/saldo`, { tags: { name: 'saldo' } });
+  sleep(2);
+}
+
+export function hacerRecarga() {
+  http.post(`${__ENV.BASE_URL}/api/v1/recargas`, JSON.stringify({ valor: 5000 }),
+    { headers: { 'Content-Type': 'application/json' }, tags: { name: 'recarga' } });
+}</script>
+
+<script type="text/plain" id="c-env"># Bash / Git Bash
+k6 run -e BASE_URL=https://qa.tu-servicio.local -e CLAVE=xxxx script.js
+
+# En el script se leen con __ENV
+const BASE_URL = __ENV.BASE_URL || 'https://qa.tu-servicio.local';
+
+# Nunca dejes claves ni tokens escritos en el script ni en el repositorio</script>
+
+<script type="text/plain" id="c-csv">import http from 'k6/http';
+import { SharedArray } from 'k6/data';
+import papaparse from 'https://jslib.k6.io/papaparse/5.1.1/index.js';
+
+// datos/terminales.csv  ->  terminal,celular,valor
+const terminales = new SharedArray('terminales', function () {
+  return papaparse.parse(open('./datos/terminales.csv'), { header: true }).data;
+});
+
+export default function () {
+  // Una fila distinta por VU e iteración
+  const fila = terminales[(__VU * 1000 + __ITER) % terminales.length];
+
+  http.post(`${__ENV.BASE_URL}/api/v1/recargas`, JSON.stringify({
+    terminal: fila.terminal,
+    celular: fila.celular,
+    valor: Number(fila.valor),
+  }), { headers: { 'Content-Type': 'application/json' } });
+}</script>
+
+<script type="text/plain" id="c-corr">import http from 'k6/http';
+import { check, group, sleep } from 'k6';
+
+const BASE = __ENV.BASE_URL;
+const JSON_H = { 'Content-Type': 'application/json' };
+
+export default function () {
+  let token;
+
+  group('01 Autenticación', () => {
+    const res = http.post(`${BASE}/api/v1/auth/token`,
+      JSON.stringify({ terminal: 'T-QA-001', clave: __ENV.CLAVE }), { headers: JSON_H });
+    check(res, { 'login 200': (r) => r.status === 200 });
+    token = res.json('token');                 // se extrae el valor dinámico
+  });
+
+  const auth = { headers: { ...JSON_H, Authorization: `Bearer ${token}` } };
+  sleep(2);
+
+  group('02 Consultar saldo', () => {
+    const res = http.get(`${BASE}/api/v1/saldo`, { ...auth, tags: { name: 'saldo' } });
+    check(res, { 'saldo 200': (r) => r.status === 200 });
+  });
+  sleep(3);
+
+  group('03 Recarga', () => {
+    const res = http.post(`${BASE}/api/v1/recargas`,
+      JSON.stringify({ celular: '3001234567', valor: 5000 }), { ...auth, tags: { name: 'recarga' } });
+    check(res, { 'recarga aprobada': (r) => r.json('estado') === 'APROBADA' });
+  });
+  sleep(4);
+}</script>
+
+<script type="text/plain" id="c-out"># Exportar el dashboard como reporte HTML al terminar
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=reporte.html k6 run script.js
+
+# Resultados crudos, punto por punto
+k6 run --out json=resultados.json script.js
+k6 run --out csv=resultados.csv script.js
+
+# Resumen con todos los detalles (por grupo y escenario)
+k6 run --summary-mode=full script.js
+
+# Enviar a Prometheus / InfluxDB para verlo en Grafana
+k6 run --out experimental-prometheus-rw script.js</script>
+
+<script type="text/plain" id="c-summary">import { textSummary } from 'https://jslib.k6.io/k6-summary/0.1.0/index.js';
+
+export function handleSummary(data) {
+  const fecha = new Date().toISOString().slice(0, 10);
+  return {
+    stdout: textSummary(data, { indent: ' ', enableColors: true }),  // se sigue viendo en consola
+    [`reportes/summary-${fecha}.json`]: JSON.stringify(data, null, 2), // evidencia
+  };
+}</script>
+
+<script type="text/plain" id="c-browser">import { browser } from 'k6/browser';
+import { check } from 'k6';
+
+export const options = {
+  scenarios: {
+    ui: {
+      executor: 'shared-iterations',
+      vus: 1,
+      iterations: 3,
+      options: { browser: { type: 'chromium' } },   // obligatorio para usar el navegador
+    },
+  },
+  thresholds: {
+    browser_web_vital_lcp: ['p(75)<2500'],
+    browser_web_vital_inp: ['p(75)<200'],
+    browser_web_vital_cls: ['p(75)<0.1'],
+  },
+};
+
+export default async function () {
+  const page = await browser.newPage();
+  try {
+    await page.goto(`${__ENV.BASE_URL}/login`);
+    await page.locator('#usuario').fill('qa_carga');
+    await page.locator('#clave').fill(__ENV.CLAVE);
+    await page.locator('button[type="submit"]').click();
+    await page.waitForLoadState('networkidle');
+
+    const titulo = await page.locator('h1').textContent();
+    check(titulo, { 'entró al inicio': (t) => t && t.includes('Inicio') });
+  } finally {
+    await page.close();
+  }
+}</script>
+
+<script type="text/plain" id="c-repo">pruebas-rendimiento/
+├── scripts/
+│   ├── recarga/
+│   │   ├── smoke.js
+│   │   ├── carga-promedio.js
+│   │   └── estres.js
+│   └── consulta-saldo/
+├── lib/
+│   ├── auth.js          # login reutilizable
+│   └── config.js        # thresholds y URLs por ambiente
+├── datos/
+│   └── terminales.csv   # solo datos sintéticos
+├── reportes/            # en .gitignore
+└── README.md            # cómo ejecutar y a quién avisar</script>
+
+<script type="text/plain" id="c-ci">name: rendimiento
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1-5'   # 1:00 a. m. hora Colombia, de lunes a viernes
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - uses: grafana/run-k6-action@v1
+        env:
+          BASE_URL: ${{ vars.QA_BASE_URL }}
+          CLAVE: ${{ secrets.QA_CLAVE }}
+        with:
+          path: scripts/recarga/smoke.js</script>
+
+<script>
+(function(){
+/* ---------- utilidades ---------- */
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const KW = /^(import|from|export|const|let|function|return|if|async|await|new|default|try|finally|true|false)$/;
+function hl(src){
+  const re = /(\/\/[^\n]*|#[^\n]*)|('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`)|\b([A-Za-z_]+)\b|(\b\d+(?:\.\d+)?\b)/g;
+  let out='', last=0, m;
+  while((m = re.exec(src))){
+    out += esc(src.slice(last, m.index));
+    if(m[1]){
+      // "#" solo es comentario al inicio de línea (shell); en JS lo dejamos
+      const isHash = m[1][0]==='#';
+      const lineStart = m.index===0 || src[m.index-1]==='\n' || /^\s*$/.test(src.slice(src.lastIndexOf('\n',m.index-1)+1, m.index));
+      if(isHash && !lineStart){ out += esc(m[1][0]); re.lastIndex = m.index+1; last = m.index+1; continue; }
+      out += '<span class="tk-c">'+esc(m[1])+'</span>';
+    }
+    else if(m[2]) out += '<span class="tk-s">'+esc(m[2])+'</span>';
+    else if(m[3]) out += KW.test(m[3]) ? '<span class="tk-k">'+m[3]+'</span>' : esc(m[3]);
+    else if(m[4]) out += '<span class="tk-n">'+m[4]+'</span>';
+    last = re.lastIndex;
+  }
+  return out + esc(src.slice(last));
+}
+function setCode(pre, src){ pre.dataset.raw = src; pre.innerHTML = hl(src); }
+$$('pre[data-src]').forEach(pre => {
+  const s = document.getElementById(pre.dataset.src);
+  if(s) setCode(pre, s.textContent.replace(/^\n/,''));
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest('.copy'); if(!b) return;
+  const pre = b.closest('.code').querySelector('pre');
+  const txt = pre.dataset.raw || pre.textContent;
+  const done = () => { b.textContent='Copiado'; setTimeout(()=>b.textContent='Copiar',1400); };
+  try{
+    navigator.clipboard.writeText(txt).then(done, () => selectPre(pre, b));
+  }catch(err){ selectPre(pre, b); }
+});
+function selectPre(pre, b){
+  const r = document.createRange(); r.selectNodeContents(pre);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  b.textContent='Ctrl+C para copiar'; setTimeout(()=>b.textContent='Copiar',2200);
+}
+
+/* ---------- navegación ---------- */
+const mods = $$('section.mod');
+const N = mods.length - 1;
+let cur = 0;
+const store = { get(k){ try{return localStorage.getItem(k);}catch(e){return null;} }, set(k,v){ try{localStorage.setItem(k,v);}catch(e){} } };
+const dots = $('#dots'), toc = $('#toc');
+mods.forEach((m,i) => {
+  if(i===0) return;
+  const d = document.createElement('button');
+  d.className='dot'; d.type='button'; d.title = i+'. '+m.dataset.title; d.setAttribute('aria-label', 'Módulo '+i+': '+m.dataset.title);
+  d.addEventListener('click', () => go(i)); dots.appendChild(d);
+  const t = document.createElement('button'); t.type='button';
+  t.innerHTML = '<span class="n">'+String(i).padStart(2,'0')+'</span><span class="t">'+m.dataset.title+'</span>';
+  t.addEventListener('click', () => go(i)); toc.appendChild(t);
+});
+function go(i, noScroll){
+  cur = Math.max(0, Math.min(N, i));
+  mods.forEach((m,k) => m.hidden = k!==cur);
+  $$('.dot', dots).forEach((d,k) => { d.classList.toggle('now', k+1===cur); d.classList.toggle('done', k+1<cur); });
+  $('#count').textContent = cur ? cur+' / '+N : N+' módulos';
+  $('#barfill').style.width = (cur/N*100)+'%';
+  $('#prev').disabled = cur===0;
+  $('#next').textContent = cur===0 ? 'Empezar →' : (cur===N ? 'Volver a la portada' : 'Siguiente →');
+  $('#where').textContent = cur ? 'Módulo '+cur+' · '+mods[cur].dataset.title : 'Portada';
+  try{ history.replaceState(null,'', cur ? '#m'+cur : location.pathname+location.search); }catch(e){}
+  store.set('k6c-mod', cur);
+  if(!noScroll) window.scrollTo({top:0});
+}
+$('#prev').addEventListener('click', () => go(cur-1));
+$('#next').addEventListener('click', () => go(cur===N ? 0 : cur+1));
+$('#home').addEventListener('click', () => go(0));
+$$('[data-go]').forEach(b => b.addEventListener('click', () => go(+b.dataset.go)));
+document.addEventListener('keydown', e => {
+  if(e.target.closest('input,textarea,select')) return;
+  if(e.key==='ArrowRight' && cur<N) go(cur+1);
+  if(e.key==='ArrowLeft' && cur>0) go(cur-1);
+});
+
+/* ---------- tipos de prueba ---------- */
+const TYPES = {
+  smoke:{ label:'Smoke', file:'smoke.js', pts:[[0,3],[1,3]], unit:'min', yl:'VUs',
+    meta:[['Carga','Mínima (1–5 VUs)'],['Duración','Segundos o pocos minutos'],['Pregunta','¿El script y el sistema funcionan?']],
+    desc:'Valida que el script no tenga errores y que el sistema responda bien con carga mínima. Da los primeros valores de referencia. Si un smoke falla, no tiene sentido seguir con pruebas más grandes.',
+    ctx:'En cada despliegue a QA o cuando cambia el código del servicio o del script. Es el candidato natural para correr en el pipeline.',
+    code:`export const options = {
+  vus: 3,
+  duration: '1m',
+  thresholds: {
+    http_req_failed: ['rate<0.01'],
+    http_req_duration: ['p(95)<800'],
+  },
+};` },
+  load:{ label:'Carga promedio', file:'carga-promedio.js', pts:[[0,0],[5,100],[35,100],[40,0]], unit:'min', yl:'VUs',
+    meta:[['Carga','Tráfico promedio de producción'],['Duración','5–60 minutos'],['Pregunta','¿Cumple los SLO en un día normal?']],
+    desc:'Reproduce el uso típico del sistema. Sube gradualmente (para que cachés y conexiones se calienten), mantiene la carga en una meseta y baja. Su resultado se convierte en la línea base contra la que comparas cada versión.',
+    ctx:'Antes de cada release de un servicio crítico y periódicamente para vigilar regresiones de rendimiento. Usa como objetivo el volumen de una hora normal de operación.',
+    code:`export const options = {
+  stages: [
+    { duration: '5m', target: 100 },   // subida
+    { duration: '30m', target: 100 },  // meseta
+    { duration: '5m', target: 0 },     // bajada
+  ],
+  thresholds: {
+    http_req_failed: ['rate<0.01'],
+    http_req_duration: ['p(95)<800'],
+  },
+};` },
+  stress:{ label:'Estrés', file:'estres.js', pts:[[0,0],[10,200],[40,200],[45,0]], unit:'min', yl:'VUs',
+    meta:[['Carga','Por encima del promedio (+50 % a +100 %)'],['Duración','5–60 minutos'],['Pregunta','¿Cómo se comporta bajo alta demanda?']],
+    desc:'Evalúa el sistema con más carga de la habitual. Observa cuánto se degrada, si los errores son controlados (respuestas claras en lugar de caídas) y si se recupera cuando la carga baja. Solo se hace después de que la carga promedio pasa.',
+    ctx:'Antes de fechas de alta transaccionalidad previsibles (pagos de nómina y primas, fin de mes, temporadas comerciales) o cuando el negocio espera crecimiento.',
+    code:`export const options = {
+  stages: [
+    { duration: '10m', target: 200 },  // subida lenta por encima del promedio
+    { duration: '30m', target: 200 },
+    { duration: '5m', target: 0 },
+  ],
+  thresholds: {
+    http_req_failed: [{ threshold: 'rate<0.05', abortOnFail: true }],
+    http_req_duration: ['p(95)<1500'],
+  },
+};` },
+  spike:{ label:'Picos', file:'picos.js', pts:[[0,0],[2,2000],[3,0]], unit:'min', yl:'VUs',
+    meta:[['Carga','Muy alta y repentina'],['Duración','Pocos minutos'],['Pregunta','¿Sobrevive una avalancha?']],
+    desc:'Simula un aumento masivo, rápido y corto. Sin meseta: sube muy rápido y baja. Lo importante es si el sistema sobrevive, si escala a tiempo y si se recupera sin intervención manual.',
+    ctx:'Cuando hay eventos que generan avalanchas de transacciones en minutos: reconexión masiva de terminales tras una caída de red, promociones con hora de inicio, cierre de recaudos.',
+    code:`export const options = {
+  stages: [
+    { duration: '2m', target: 2000 },  // subida muy rápida
+    { duration: '1m', target: 0 },     // bajada inmediata
+  ],
+  thresholds: {
+    http_req_failed: ['rate<0.10'],    // en picos se tolera algo más de error
+  },
+};` },
+  soak:{ label:'Resistencia (soak)', file:'soak.js', pts:[[0,0],[5,100],[485,100],[490,0]], unit:'min', yl:'VUs',
+    meta:[['Carga','Promedio'],['Duración','Horas (4, 8, 24)'],['Pregunta','¿Se degrada con el tiempo?']],
+    desc:'Mantiene la carga promedio durante muchas horas. Detecta problemas que solo aparecen con el tiempo: fugas de memoria, conexiones que no se liberan, logs que llenan el disco, tareas programadas que chocan con la carga.',
+    ctx:'Después de cambios grandes de arquitectura o de infraestructura, y en servicios que operan 24/7. Coordina la ventana con Infraestructura y monitorea memoria y conexiones durante toda la prueba.',
+    code:`export const options = {
+  stages: [
+    { duration: '5m', target: 100 },
+    { duration: '8h', target: 100 },   // horas de meseta
+    { duration: '5m', target: 0 },
+  ],
+  thresholds: {
+    http_req_failed: ['rate<0.01'],
+    http_req_duration: ['p(95)<800'],
+  },
+};` },
+  breakpoint:{ label:'Punto de quiebre', file:'breakpoint.js', pts:[[0,0],[120,1000]], unit:'min', yl:'iter/s',
+    meta:[['Carga','Creciente hasta que falle'],['Duración','La necesaria'],['Pregunta','¿Dónde está el límite?']],
+    desc:'Aumenta la carga de forma continua hasta que el sistema incumple los umbrales o falla. Responde cuál es la capacidad máxima. Usa un ejecutor de tasa de llegada y abortOnFail para detenerse en el límite.',
+    ctx:'Pocas veces: para planear capacidad, dimensionar infraestructura o validar un cambio de escalamiento. Nunca en ambientes compartidos sin aviso, porque los deja inutilizables mientras dura.',
+    code:`export const options = {
+  scenarios: {
+    breakpoint: {
+      executor: 'ramping-arrival-rate',
+      preAllocatedVUs: 100,
+      maxVUs: 2000,
+      stages: [{ duration: '2h', target: 1000 }],  // hasta 1000 iteraciones/s
+    },
+  },
+  thresholds: {
+    http_req_failed: [{ threshold: 'rate<0.05', abortOnFail: true }],
+    http_req_duration: [{ threshold: 'p(95)<2000', abortOnFail: true }],
+  },
+};` },
+};
+const tkeys = Object.keys(TYPES);
+const ttabs = $('#ttabs');
+tkeys.forEach((k,i) => {
+  const b = document.createElement('button'); b.className='tab'; b.type='button'; b.role='tab';
+  b.textContent = TYPES[k].label; b.dataset.k=k;
+  b.addEventListener('click', () => showType(k)); ttabs.appendChild(b);
+});
+function fmtT(m){ return m>=60 ? (m/60).toFixed(m%60?1:0)+' h' : m+' min'; }
+function showType(k){
+  const t = TYPES[k];
+  $$('.tab', ttabs).forEach(b => b.setAttribute('aria-selected', b.dataset.k===k));
+  const W=640,H=230,L=52,R=18,T=16,B=36;
+  const maxT = t.pts[t.pts.length-1][0], maxV = Math.max(...t.pts.map(p=>p[1]));
+  const yTop = niceMax(maxV);
+  const x = v => L + v/maxT*(W-L-R), y = v => H-B - v/yTop*(H-T-B);
+  let s='';
+  for(let i=0;i<=4;i++){ const v=yTop*i/4; s+=`<line class="ax" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${Math.round(v)}</text>`; }
+  const xt = [0, maxT/4, maxT/2, maxT*3/4, maxT];
+  xt.forEach(v => s+=`<text x="${x(v)}" y="${H-B+18}" text-anchor="middle">${fmtT(Math.round(v*10)/10)}</text>`);
+  const line = t.pts.map(p=>x(p[0])+','+y(p[1])).join(' ');
+  s += `<polygon class="ar" points="${x(t.pts[0][0])},${y(0)} ${line} ${x(maxT)},${y(0)}"/>`;
+  s += `<polyline class="ln" points="${line}"/>`;
+  s += `<text x="${L}" y="${T-4}" text-anchor="start">${t.yl}</text>`;
+  $('#tchart').innerHTML = s;
+  $('#tmeta').innerHTML = t.meta.map(m=>`<div><dt>${m[0]}</dt><dd>${m[1]}</dd></div>`).join('');
+  $('#tdesc').textContent = t.desc; $('#tctx').textContent = t.ctx;
+  $('#tfile').textContent = t.file; setCode($('#tcode'), t.code);
+}
+function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v))); const n=v/p; return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p; }
+showType('smoke');
+
+/* ---------- calculadora ---------- */
+function calc(){
+  const txh = +$('#cTxh').value||0, resp=+$('#cResp').value||0, think=+$('#cThink').value||0, g=+$('#cFactor').value||0;
+  const tps = txh/3600, it = resp+think, vus = Math.ceil(tps*it), tpsG = tps*(1+g/100), vusG = Math.ceil(tpsG*it);
+  $('#cTps').innerHTML = tps.toFixed(1)+' <small>iteraciones/s</small>';
+  $('#cVus').innerHTML = vus+' <small>VUs</small>';
+  $('#cVusG').innerHTML = vusG+' <small>VUs · '+tpsG.toFixed(1)+'/s</small>';
+  setCode($('#cCode'), `export const options = {
+  scenarios: {
+    carga_promedio: {
+      executor: 'constant-arrival-rate',
+      rate: ${Math.max(1,Math.round(tps))},            // iteraciones por segundo
+      timeUnit: '1s',
+      duration: '30m',
+      preAllocatedVUs: ${Math.max(1,vus)},  // calculados con la Ley de Little
+      maxVUs: ${Math.max(2,vus*2)},          // margen si las respuestas se vuelven lentas
+    },
+  },
+};`);
+}
+['cTxh','cResp','cThink','cFactor'].forEach(id => $('#'+id).addEventListener('input', calc)); calc();
+
+/* ---------- lector de resumen ---------- */
+const SUM = [
+  ['  █ THRESHOLDS',''],
+  ['',''],
+  ['    http_req_duration',''],
+  ["    ✓ 'p(95)<800' p(95)=612.4ms",'th'],
+  ['',''],
+  ['    http_req_failed',''],
+  ["    ✗ 'rate<0.01' rate=1.84%",'thf'],
+  ['',''],
+  ['  █ TOTAL RESULTS',''],
+  ['',''],
+  ['    checks_total.......: 14220  39.5/s','ck'],
+  ['    checks_succeeded...: 98.16% 13958 out of 14220','ck'],
+  ['    checks_failed......: 1.84%  262 out of 14220','ck'],
+  ['',''],
+  ['    ✓ status 200',''],
+  ['    ✗ recarga aprobada','ckf'],
+  ['      ↳  96% — ✓ 4478 / ✗ 262','ckf'],
+  ['',''],
+  ['    HTTP',''],
+  ['    http_req_duration..............: avg=284.1ms min=61.3ms med=210.7ms max=9.8s p(90)=498.2ms p(95)=612.4ms','dur'],
+  ['      { expected_response:true }...: avg=231.5ms min=61.3ms med=205.2ms max=1.9s p(90)=441.0ms p(95)=530.8ms','exp'],
+  ['    http_req_failed................: 1.84%  262 out of 14220','fail'],
+  ['    http_reqs......................: 14220  39.5/s','reqs'],
+  ['',''],
+  ['    EXECUTION',''],
+  ['    dropped_iterations.............: 118    0.33/s','drop'],
+  ['    iteration_duration.............: avg=9.9s min=9.1s med=9.6s max=21.4s p(90)=10.4s p(95)=11.0s','itd'],
+  ['    iterations.....................: 4740   13.2/s','it'],
+  ['    vus............................: 42     min=0       max=150','vus'],
+  ['    vus_max........................: 150    min=150     max=150','vus'],
+  ['',''],
+  ['    NETWORK',''],
+  ['    data_received..................: 18 MB  51 kB/s','net'],
+  ['    data_sent......................: 4.1 MB 11 kB/s','net'],
+];
+const EXP = {
+  th:['Threshold cumplido','El p(95) de todas las peticiones fue 612 ms, por debajo del límite de 800 ms. Este criterio pasa.'],
+  thf:['Threshold incumplido','La tasa de error fue 1,84 % y el límite era 1 %. Basta con un threshold incumplido para que la prueba falle: k6 termina con código de salida 99 y el pipeline se detiene. Es el primer hallazgo a reportar.'],
+  ck:['Checks','Del total de validaciones, el 98,16 % pasó. Si tienes un threshold sobre checks (por ejemplo rate>0.99), aquí también se incumpliría.'],
+  ckf:['Check fallido con detalle','262 recargas no devolvieron estado APROBADA. Cruza este dato con los logs del servicio en la misma franja horaria: ¿son rechazos de negocio, timeouts o errores 5xx?'],
+  dur:['Duración de las peticiones','Lee los percentiles, no el promedio. Aquí p(95)=612 ms está bien, pero max=9,8 s indica colas: algunas peticiones esperaron casi 10 s. Investiga si coinciden con el momento de mayor carga.'],
+  exp:['Solo respuestas exitosas','Las mismas estadísticas sin contar los errores. Si este valor es mucho mejor que la línea anterior, los errores eran lentos (típico de timeouts). Si es peor, los errores eran rápidos (típico de rechazos inmediatos).'],
+  fail:['Tasa de error HTTP','Proporción de peticiones con status fuera de 200–399 o que no obtuvieron respuesta. Es la misma métrica que incumplió el threshold.'],
+  reqs:['Throughput','Se hicieron 39,5 peticiones por segundo en promedio. Compáralo con el objetivo de la prueba y con el volumen de producción.'],
+  drop:['Iteraciones descartadas','Solo aparece con ejecutores de tasa de llegada. k6 no tuvo VUs libres para iniciar 118 iteraciones a tiempo, así que la tasa objetivo no se alcanzó. O el sistema se puso lento, o maxVUs era muy bajo. Un resultado con dropped_iterations no demuestra que el sistema soporta la tasa pedida.'],
+  itd:['Duración de la iteración','Un flujo completo (login, saldo, recarga y los sleep) tardó en promedio 9,9 s. El think time suma 9 s, así que el sistema aportó cerca de 1 s.'],
+  it:['Iteraciones completadas','Flujos de negocio completos. Esta es la cifra que traduces a transacciones de negocio para el informe.'],
+  vus:['Usuarios virtuales','Cuántos VUs estuvieron activos (al momento del fin y su máximo). Si vus llegó a vus_max durante la prueba, k6 se quedó sin VUs para sostener la carga.'],
+  net:['Red','Volumen de datos transferido. Útil para verificar que la máquina que genera la carga y la red no sean el cuello de botella.'],
+};
+const sum = $('#sum');
+SUM.forEach(([txt,key]) => {
+  const sp = document.createElement('span'); sp.className='ln2'+(key?'':' plain'); sp.textContent = txt || ' ';
+  if(key){ sp.tabIndex=0; sp.setAttribute('role','button');
+    const act = () => { $$('.ln2',sum).forEach(l=>l.classList.remove('sel')); sp.classList.add('sel');
+      $('#sumx').innerHTML = '<div class="eyebrow">'+EXP[key][0]+'</div><p>'+EXP[key][1]+'</p>'; };
+    sp.addEventListener('click', act); sp.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();act();} });
+  }
+  sum.appendChild(sp);
+});
+
+/* ---------- checklist ---------- */
+const CHECK = [
+  'Hay una tarea en Jira y un caso de prueba en Zephyr para esta ejecución',
+  'El ambiente es el acordado (nunca producción sin autorización escrita)',
+  'Desarrollo e Infraestructura saben fecha, hora y duración de la prueba',
+  'Los servicios de terceros están simulados o hay autorización del proveedor',
+  'Los datos son sintéticos y hay un plan para limpiarlos o reversarlos',
+  'Corrió un smoke test sin errores',
+  'Los thresholds están definidos con base en requisitos o en la línea base',
+  'Hay monitoreo del servidor (CPU, memoria, BD) durante la ventana de la prueba',
+  'La máquina que genera la carga tiene recursos suficientes y no es la misma del servicio',
+];
+const chk = $('#check');
+CHECK.forEach((t,i) => {
+  const l = document.createElement('label'); l.style.cssText='display:flex;gap:10px;align-items:flex-start;cursor:pointer';
+  l.innerHTML = '<input type="checkbox" id="chk'+i+'" style="width:auto;margin-top:5px"> <span>'+t+'</span>';
+  chk.appendChild(l);
+});
+const cs = document.createElement('p'); cs.className='fb'; cs.id='chkstate'; chk.appendChild(cs);
+function chkUpd(){ const n = $$('input',chk).filter(c=>c.checked).length; cs.textContent = n===CHECK.length ? 'Todo listo: puedes ejecutar.' : n+' de '+CHECK.length+' verificados.'; }
+chk.addEventListener('change', chkUpd); chkUpd();
+
+/* ---------- constructor ---------- */
+const bType = $('#bType');
+tkeys.forEach(k => { const o=document.createElement('option'); o.value=k; o.textContent=TYPES[k].label; bType.appendChild(o); });
+bType.value='load';
+function build(){
+  const name = ($('#bName').value||'flujo').trim().replace(/\s+/g,'-').toLowerCase();
+  const k = bType.value, meth = $('#bMethod').value, path = $('#bPath').value||'/', url = $('#bUrl').value||'https://qa.tu-servicio.local';
+  const st = +$('#bStatus').value||200, p95=+$('#bP95').value||1000, err=(+$('#bErr').value||0)/100, think=+$('#bThink').value||0;
+  const bearer = $('#bAuth').value==='bearer', hasBody = meth!=='GET';
+  let body = ($('#bBody').value||'{}').trim();
+  let bodyOk = true; try{ JSON.parse(body); }catch(e){ bodyOk=false; }
+  // carga del tipo elegido, sin thresholds propios
+  let load = TYPES[k].code.replace(/^export const options = \{\n/,'').replace(/\n\};$/,'');
+  load = load.replace(/\n  thresholds: \{[\s\S]*?\n  \},/,'');
+  const headers = ["'Content-Type': 'application/json'"]; if(bearer) headers.push("Authorization: `Bearer ${__ENV.TOKEN}`");
+  const req = hasBody
+    ? `http.${meth==='PUT'?'put':'post'}(\`\${BASE_URL}${path}\`, JSON.stringify(payload), params)`
+    : `http.get(\`\${BASE_URL}${path}\`, params)`;
+  const code =
+`import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+// Tipo de prueba: ${TYPES[k].label}
+const BASE_URL = __ENV.BASE_URL || '${url}';
+
+export const options = {
+${load}
+  thresholds: {
+    http_req_failed: ['rate<${err}'],
+    'http_req_duration{name:${name}}': ['p(95)<${p95}'],
+    checks: ['rate>0.99'],
+  },
+};
+${hasBody ? `
+const payload = ${bodyOk ? body : '{ /* revisa el JSON: no es válido */ }'};
+` : ''}
+export default function () {
+  const params = {
+    headers: { ${headers.join(', ')} },
+    tags: { name: '${name}' },
+  };
+
+  const res = ${req};
+
+  check(res, {
+    'status ${st}': (r) => r.status === ${st},
+  });
+${think ? `
+  sleep(${think});` : ''}
+}
+`;
+  $('#bFile').textContent = name+'.js';
+  setCode($('#bOut'), code);
+  setCode($('#bRun'), `# Primero un smoke rápido para validar el script
+k6 run --vus 1 --iterations 1 -e BASE_URL=${url}${bearer?' -e TOKEN=<token>':''} ${name}.js
+
+# Ejecución completa con dashboard y reporte HTML
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=reporte-${name}.html \\
+  k6 run -e BASE_URL=${url}${bearer?' -e TOKEN=<token>':''} ${name}.js`);
+}
+$$('#m12 input, #m12 select, #m12 textarea').forEach(el => el.addEventListener('input', build));
+build();
+
+/* ---------- evaluación y certificado ---------- */
+const PASS = 16;
+const EX = [
+ {m:'M1', q:'Una recarga tiene el criterio "p(95) menor a 1 segundo". El reporte dice p(95)=870 ms y max=6,2 s. ¿Qué concluyes?',
+  o:['El criterio falla porque el máximo supera 1 s','El criterio se cumple; el máximo indica colas que vale la pena investigar','No se puede concluir nada sin el promedio','El criterio falla porque p(95) debe ser menor que el promedio'],a:1,
+  e:'El 95 % de las recargas tardó 870 ms o menos, así que el criterio pasa. Un máximo alto no reprueba el p(95), pero es un hallazgo: algunas transacciones esperaron mucho.'},
+ {m:'M1', q:'¿Por qué los criterios de rendimiento se escriben con percentiles y no con el promedio?',
+  o:['Porque k6 no calcula promedios','Porque el promedio esconde a los usuarios que esperaron mucho','Porque los percentiles siempre son menores','Porque ISO 25010 prohíbe usar promedios'],a:1,
+  e:'Unas pocas peticiones muy lentas casi no mueven el promedio, pero sí afectan a personas reales. Los percentiles muestran cómo le fue a la mayoría y a la cola.'},
+ {m:'M2', q:'Este script falla al iniciar. ¿Por qué?', c:"import http from 'k6/http';\n\nexport default function () {\n  const datos = open('./terminales.csv');\n  http.get(`${__ENV.BASE_URL}/saldo`);\n}",
+  o:['Falta la función setup()','open() solo puede usarse en la etapa init, fuera de las funciones','http.get no acepta template strings','Falta definir options'],a:1,
+  e:'open() lee archivos y solo está disponible en el contexto init. Lo correcto es cargarlo arriba, idealmente con SharedArray.'},
+ {m:'M3', q:'El script tiene options con vus: 10. Lo ejecutas con "k6 run --vus 30 script.js". ¿Con cuántos VUs corre?',
+  o:['10, porque manda el script','30, porque los flags de la CLI tienen la mayor prioridad','40, porque se suman','k6 muestra un error por el conflicto'],a:1,
+  e:'El orden de prioridad es: valores por defecto, options del script, variables K6_* y, por último, flags de la CLI, que ganan.'},
+ {m:'M4', q:'El 3 % de los checks falló, pero la prueba terminó con código de salida 0. ¿Qué pasó?',
+  o:['k6 tiene un error','Los checks no reprueban la prueba por sí solos; faltaba un threshold sobre checks','El código 0 indica que hubo errores','Los checks solo cuentan en Grafana Cloud'],a:1,
+  e:'Un check fallido solo se contabiliza. Para que repruebe la ejecución necesitas un threshold, por ejemplo checks: [\'rate>0.99\'].'},
+ {m:'M4', q:'En el pipeline, k6 terminó con código de salida 99. ¿Qué significa?',
+  o:['El script tiene un error de sintaxis','Se incumplió al menos un threshold','La prueba se canceló manualmente','Se acabaron los VUs'],a:1,
+  e:'El código 99 indica que uno o más thresholds no se cumplieron. Es lo que hace fallar el pipeline de forma intencional.'},
+ {m:'M4', q:'Quieres medir el porcentaje de recargas con estado APROBADA. ¿Qué tipo de métrica personalizada usas?',
+  o:['Counter','Gauge','Rate','Trend'],a:2,
+  e:'Rate calcula la proporción de valores verdaderos. Counter suma, Gauge guarda el último valor y Trend calcula estadísticas como percentiles.'},
+ {m:'M5', q:'El requisito dice: "el servicio debe procesar 50 recargas por segundo". ¿Qué ejecutor usas?',
+  o:['constant-vus','per-vu-iterations','constant-arrival-rate','shared-iterations'],a:2,
+  e:'Un requisito expresado en tasa se modela con un ejecutor de tasa de llegada (modelo abierto), que mantiene el ritmo aunque el sistema se ponga lento.'},
+ {m:'M5', q:'Con ramping-vus el sistema se volvió lento, pero el reporte muestra menos peticiones por segundo y casi ningún error. ¿Cuál es el riesgo?',
+  o:['Ninguno: menos errores es mejor','El modelo cerrado redujo la carga al esperar respuestas y pudo ocultar la degradación','k6 dejó de medir','Faltaron thresholds de red'],a:1,
+  e:'En el modelo cerrado cada VU espera la respuesta antes de seguir, así que un sistema lento recibe menos carga. Los puntos de venta reales no esperan: por eso conviene el modelo abierto.'},
+ {m:'M6', q:'500 VUs necesitan leer un CSV de 10.000 terminales. ¿Cuál es la forma correcta?',
+  o:['open() dentro de default','Un SharedArray en la etapa init','Una petición HTTP por fila en setup()','Pegar los datos en el script'],a:1,
+  e:'SharedArray carga el archivo una sola vez y lo comparte entre todos los VUs en modo de solo lectura. Ahorra mucha memoria.'},
+ {m:'M6', q:'El login devuelve { "token": "abc..." } y la recarga necesita ese token. ¿Cómo se obtiene?',
+  o:['Escribiéndolo a mano en el script','Con res.json(\'token\') y enviándolo en el header Authorization','Con __ENV.token','No es posible en k6'],a:1,
+  e:'Eso es correlación: extraer un valor dinámico de una respuesta y usarlo en la siguiente petición.'},
+ {m:'M6', q:'Un script de carga promedio no tiene ningún sleep(). ¿Qué efecto tiene?',
+  o:['Ninguno','Cada VU genera mucha más carga que un usuario real, y el número de VUs deja de representar usuarios','k6 agrega un sleep automático de 1 s','La prueba no arranca'],a:1,
+  e:'Sin think time cada VU dispara peticiones sin pausa. La prueba deja de reflejar el comportamiento humano y los resultados no se pueden comparar con producción.'},
+ {m:'M7', q:'Acabas de escribir un script nuevo para el flujo de recarga. ¿Qué ejecutas primero?',
+  o:['Estrés','Smoke','Resistencia','Punto de quiebre'],a:1,
+  e:'El smoke valida que el script funcione y que el sistema responda con carga mínima. Sin eso, las pruebas grandes no son confiables.'},
+ {m:'M7', q:'Después de 6 horas en producción el servicio se vuelve lento y hay que reiniciarlo. ¿Qué prueba reproduce este problema?',
+  o:['Picos','Smoke','Resistencia (soak)','Estrés'],a:2,
+  e:'Los problemas que se acumulan con el tiempo, como fugas de memoria o conexiones sin liberar, solo aparecen con carga sostenida durante horas.'},
+ {m:'M7', q:'Tras una caída de red, miles de terminales se reconectan y transaccionan al mismo tiempo durante unos minutos. ¿Qué tipo de prueba aplica?',
+  o:['Picos','Carga promedio','Resistencia','Smoke'],a:0,
+  e:'Un aumento masivo, repentino y corto es exactamente lo que valida una prueba de picos: si el sistema sobrevive y se recupera solo.'},
+ {m:'M7', q:'Infraestructura pregunta cuántas transacciones por segundo aguanta el servicio antes de fallar. ¿Cuál es la mejor configuración?',
+  o:['constant-vus con 10 VUs durante 1 hora','ramping-arrival-rate creciente con thresholds y abortOnFail','Un smoke repetido varias veces','per-vu-iterations con 1 iteración'],a:1,
+  e:'Una prueba de punto de quiebre sube la tasa de forma continua y se detiene cuando se incumplen los umbrales. Ese punto es la capacidad máxima.'},
+ {m:'M8', q:'En la hora pico hay 36.000 transacciones y cada iteración (respuesta + think time) dura 5 s. ¿Cuántos VUs necesitas?',
+  o:['10','50','180','7.200'],a:1,
+  e:'36.000 / 3.600 = 10 transacciones por segundo. Por la Ley de Little: 10 × 5 s = 50 VUs.'},
+ {m:'M9', q:'Con constant-arrival-rate el resumen muestra dropped_iterations: 340. ¿Qué significa?',
+  o:['340 peticiones devolvieron error 500','k6 no tuvo VUs libres para iniciar 340 iteraciones, así que no se alcanzó la tasa objetivo','Se perdieron 340 filas del CSV','340 checks fallaron'],a:1,
+  e:'El resultado no demuestra que el sistema soporte la tasa pedida. Revisa maxVUs y si el sistema se volvió lento.'},
+ {m:'M10', q:'Necesitas medir la experiencia en el navegador mientras el backend está bajo carga. ¿Cuál es el enfoque recomendado?',
+  o:['500 VUs de navegador','Muchos VUs HTTP para la carga y unos pocos VUs de navegador que miden LCP, INP y CLS','Solo pruebas HTTP; el navegador no importa','Solo pruebas de navegador'],a:1,
+  e:'Un navegador consume muchos recursos. El enfoque híbrido genera la carga por HTTP y mide la experiencia con pocos navegadores en paralelo.'},
+ {m:'M11', q:'Te piden ejecutar una prueba de estrés hoy contra producción "porque QA no se parece". ¿Qué haces?',
+  o:['La ejecutas fuera de horario para no afectar a nadie','No la ejecutas sin autorización escrita y coordinación con Infraestructura; propones alternativas','La ejecutas con pocos VUs','La ejecutas y avisas después'],a:1,
+  e:'Una prueba de carga sin coordinar puede tumbar el servicio y se confunde con un ataque. Primero autorización, ventana acordada, terceros simulados y monitoreo.'},
+];
+const L = ['A','B','C','D'];
+const ex = { i:0, ans:[], name:'', id:'' };
+const panes = ['exIntro','exRun','exRes','exCertForm','exCert'];
+function pane(id){ panes.forEach(p => { const el = document.getElementById(p); el.hidden = p!==id; }); window.scrollTo({top:0}); }
+$('#exBar').innerHTML = EX.map((_,i)=>'<span class="'+(i<PASS?'on':'')+'"></span>').join('');
+function showQ(){
+  const q = EX[ex.i];
+  $('#exProg').style.width = (ex.i/EX.length*100)+'%';
+  $('#exTag').textContent = 'Módulo '+q.m.slice(1);
+  $('#exNum').textContent = 'Pregunta '+(ex.i+1)+' de '+EX.length;
+  $('#exQ').textContent = q.q;
+  $('#exCodeWrap').hidden = !q.c; if(q.c) setCode($('#exCode'), q.c);
+  $('#exFb').hidden = true; $('#exNext').hidden = true;
+  const box = $('#exOpts'); box.innerHTML='';
+  q.o.forEach((t,k) => {
+    const b = document.createElement('button'); b.type='button'; b.className='opt';
+    b.innerHTML = '<span class="lt">'+L[k]+'</span><span></span>'; b.lastChild.textContent = t;
+    b.addEventListener('click', () => pick(k));
+    box.appendChild(b);
+  });
+}
+function pick(k){
+  const q = EX[ex.i]; if(ex.ans.length>ex.i) return;
+  const ok = k===q.a; ex.ans.push(ok);
+  $$('.opt', $('#exOpts')).forEach((b,j) => { b.setAttribute('disabled',''); if(j===q.a) b.classList.add('ok'); if(j===k && !ok) b.classList.add('bad'); });
+  const fb = $('#exFb'); fb.hidden=false;
+  fb.innerHTML = '<b>'+(ok?'Correcto.':'La respuesta correcta es la '+L[q.a]+'.')+'</b>'; fb.appendChild(document.createTextNode(q.e));
+  const nx = $('#exNext'); nx.hidden=false; nx.textContent = ex.i===EX.length-1 ? 'Ver resultados' : 'Siguiente pregunta'; nx.focus();
+}
+$('#exNext').addEventListener('click', () => { if(ex.i<EX.length-1){ ex.i++; showQ(); } else results(); });
+function startExam(){ ex.i=0; ex.ans=[]; pane('exRun'); showQ(); }
+$('#exStart').addEventListener('click', startExam);
+$('#exRetry').addEventListener('click', startExam);
+function results(){
+  const sc = ex.ans.filter(Boolean).length, pct = Math.round(sc/EX.length*100), pass = sc>=PASS;
+  $('#exRing').style.background = 'conic-gradient('+(pass?'var(--accent)':'var(--fail)')+' '+(pct*3.6)+'deg, var(--sunk) 0deg)';
+  $('#exScore').textContent = sc+'/'+EX.length; $('#exPct').textContent = pct+' %';
+  const pill = $('#exPill'); pill.className = 'pill '+(pass?'pass':'fail');
+  pill.textContent = pass ? '✓ Aprobado' : '✗ No aprobado · mínimo '+PASS+'/'+EX.length;
+  $('#exMsg').textContent = pass ? 'Dominas los fundamentos de k6' : 'Vale la pena repasar antes de reintentar';
+  $('#exBrk').innerHTML = '';
+  EX.forEach((q,i) => {
+    const r = document.createElement('div'); r.className = 'brow '+(ex.ans[i]?'ok':'no');
+    r.innerHTML = '<span class="ic">'+(ex.ans[i]?'✓':'✗')+'</span><span class="tg">'+q.m+'</span><span></span>';
+    r.lastChild.textContent = q.q; $('#exBrk').appendChild(r);
+  });
+  $('#exToCert').hidden = !pass;
+  store.set('k6c-quiz', sc);
+  pane('exRes');
+}
+$('#exToCert').addEventListener('click', () => { pane('exCertForm'); $('#exName').value = ex.name; $('#exName').focus(); });
+$('#exBackRes').addEventListener('click', () => pane('exRes'));
+function makeCert(){
+  const inp = $('#exName'), v = inp.value.trim();
+  if(!v){ inp.classList.add('err'); inp.focus(); return; }
+  inp.classList.remove('err');
+  if(v!==ex.name || !ex.id){
+    const base = v.normalize('NFD').replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,4).padEnd(4,'X');
+    ex.id = 'K6-'+base+'-'+Date.now().toString(36).toUpperCase().slice(-5);
+  }
+  ex.name = v;
+  const sc = ex.ans.filter(Boolean).length, M = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'], d = new Date();
+  $('#cName').textContent = v;
+  $('#cScore').textContent = sc+'/'+EX.length+' · '+Math.round(sc/EX.length*100)+' %';
+  $('#cDate').textContent = d.getDate()+' '+M[d.getMonth()]+' '+d.getFullYear();
+  $('#cId').textContent = ex.id;
+  $('#sealTxt').textContent = 'QA · PERFORMANCE · '+d.getFullYear()+' ·';
+  let framed = true; try{ framed = window.self !== window.top; }catch(e){}
+  $('#cPrint').hidden = framed; $('#cTip').hidden = !framed;
+  pane('exCert');
+}
+$('#exMake').addEventListener('click', makeCert);
+$('#exName').addEventListener('keydown', e => { if(e.key==='Enter') makeCert(); });
+$('#cEdit').addEventListener('click', () => { pane('exCertForm'); $('#exName').focus(); });
+$('#cRestart').addEventListener('click', () => pane('exIntro'));
+$('#cPrint').addEventListener('click', () => window.print());
+
+/* ---------- inicio ---------- */
+const hm = /^#m(\d{1,2})$/.exec(location.hash);
+go(hm ? +hm[1] : 0, true);
+})();
+</script>
+
+</body></html>
+</body>
+</html>
