@@ -248,7 +248,48 @@ textarea{font-family:var(--f-mono);font-size:13px;min-height:80px;resize:vertica
 .botnav-in{max-width:880px;margin:0 auto;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center}
 .botnav .where{font-size:13px;color:var(--muted);text-align:center;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:520px){.botnav .where{display:none}.dot{width:14px}}
+
+/* candado de acceso */
+#lock{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+.lock-card{max-width:420px;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:32px 28px;display:flex;flex-direction:column;gap:14px;text-align:center;box-shadow:var(--shadow)}
+.lock-card .icon{font-size:28px}
+.lock-card h2{font-family:var(--f-display);font-size:1.4rem;margin:0}
+.lock-card p{color:var(--muted);font-size:.95rem;margin:0}
+.lock-card input{text-align:center;font-family:var(--f-mono);letter-spacing:.04em}
+.lock-card input.err{border-color:var(--fail)}
+.lock-err{min-height:1.2em;font-size:.85rem;color:var(--fail)}
 </style>
+
+<div id="lock">
+  <div class="lock-card">
+    <div class="icon">🔒</div>
+    <h2>Acceso al curso</h2>
+    <p>Este curso es de acceso restringido. Ingresa la clave que te compartieron para continuar.</p>
+    <input id="lockInput" type="text" placeholder="Clave de acceso" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="lock-err" id="lockErr"></div>
+    <button class="btn accent" type="button" id="lockBtn">Ingresar</button>
+  </div>
+</div>
+<script>
+(function(){
+  var CODE = 'K6-2026';
+  var lock = document.getElementById('lock');
+  var input = document.getElementById('lockInput');
+  var err = document.getElementById('lockErr');
+  function tryUnlock(){
+    var v = input.value.trim().toUpperCase();
+    if(v === CODE && v !== ''){
+      lock.style.display = 'none';
+    } else {
+      err.textContent = 'Clave incorrecta. Verifica con quien te la compartió e inténtalo de nuevo.';
+      input.classList.remove('err'); void input.offsetWidth; input.classList.add('err');
+    }
+  }
+  document.getElementById('lockBtn').addEventListener('click', tryUnlock);
+  input.addEventListener('keydown', function(e){ if(e.key==='Enter') tryUnlock(); });
+  input.focus();
+})();
+</script>
 
 <div id="app">
   <header class="topbar">
